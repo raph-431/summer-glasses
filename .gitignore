@@ -5,6 +5,15 @@
 .shader-test.html
 .det-test.html
 
+# build output (regenerate with `node build.js`)
+dist/
+
+# foundry (deps reinstall with `forge install`; see contract/foundry.toml)
+contract/lib/
+contract/out/
+contract/cache/
+contract/broadcast/
+
 # editor state
 .vscode/
 .idea/

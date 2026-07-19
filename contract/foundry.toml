@@ -1,0 +1,15 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.28"
+optimizer = true
+optimizer_runs = 200
+# tests/scripts read the built artwork payload from ../dist; the round-trip
+# test writes the assembled token HTML back there for the browser check
+fs_permissions = [{ access = "read-write", path = "../dist" }]
+
+remappings = [
+    "forge-std/=lib/forge-std/src/",
+    "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
+]
