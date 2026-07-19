@@ -1,0 +1,1190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Faceted Glass — Simulated Caustics</title>
+<style>
+  html, body { margin:0; height:100%; overflow:hidden; background:#b9b6b3; }
+  canvas { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #ui {
+    position:fixed; left:16px; bottom:16px; z-index:2;
+    font:12px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color:#3a3733; background:rgba(255,255,255,.55); backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding:12px 16px; border-radius:12px; border:1px solid rgba(255,255,255,.6);
+    box-shadow:0 4px 24px rgba(60,50,40,.18); user-select:none;
+  }
+  #ui h1 { margin:0 0 2px; font-size:13px; font-weight:600; }
+  #ui .hint { opacity:.65; margin-bottom:8px; }
+  #ui label { display:flex; align-items:center; gap:8px; margin-top:4px; }
+  #ui label span { width:80px; opacity:.8; }
+  #ui input[type=range] { width:120px; accent-color:#a5763a; }
+  #ui input[type=color] { width:36px; height:20px; border:none; background:none; padding:0; cursor:pointer; }
+  #audioBtn {
+    margin:2px 0 8px; padding:4px 10px; font:12px inherit; cursor:pointer;
+    border:1px solid rgba(120,90,50,.35); border-radius:8px;
+    background:rgba(255,255,255,.6); color:#3a3733;
+  }
+  #audioBtn.on { background:#a5763a; color:#fff; }
+  #err { position:fixed; inset:0; display:none; place-items:center; color:#333; font:14px sans-serif; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="err">This demo needs WebGL2 with float render targets.</div>
+<div id="ui">
+  <h1>Simulated caustics — faceted glass</h1>
+  <div class="hint">photons traced through the glass each frame<br>move the mouse to orbit — the sun stays low behind the glass</div>
+  <button id="audioBtn">🔈 cicadas</button>
+  <label><span>facet depth</span><input id="facet" type="range" min="0" max="2" step="0.01" value="1"></label>
+  <label><span>diamond shape</span><input id="diam" type="range" min="0.4" max="2.5" step="0.01" value="1" title="tall vs wide"></label>
+  <label><span>diamond count</span><input id="diamN" type="range" min="6" max="32" step="1" value="16"></label>
+  <label><span>glass depth</span><input id="wall" type="range" min="0.020" max="0.100" step="0.001" value="0.045"></label>
+  <label><span>glass tint</span><input id="glassCol" type="color" value="#eefbf1"></label>
+  <label><span>cola height</span><input id="liq" type="range" min="0.10" max="0.90" step="0.01" value="0.48"></label>
+  <label><span>cola color</span><input id="colaCol" type="color" value="#541c17"></label>
+  <label><span>condensation</span><input id="cond" type="range" min="0" max="1.5" step="0.01" value="1"></label>
+  <label><span>dispersion</span><input id="disp" type="range" min="0" max="2" step="0.01" value="0.5"></label>
+  <label><span>irregularity</span><input id="irr" type="range" min="0" max="2" step="0.01" value="1"></label>
+  <label><span>wind</span><input id="wind" type="range" min="0" max="2.5" step="0.01" value="1"></label>
+  <label><span>leaf shade</span><input id="leaf" type="range" min="0" max="1" step="0.01" value="0.85"></label>
+  <label><span>spilled water</span><input id="spill" type="range" min="0" max="1" step="0.01" value="0.65"></label>
+  <label><span>sunlight</span><input id="sun" type="range" min="0.4" max="2" step="0.01" value="1"></label>
+</div>
+
+<script>
+'use strict';
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl2', { antialias:false, alpha:false });
+if(!gl || !gl.getExtension('EXT_color_buffer_float')){
+  document.getElementById('err').style.display = 'grid';
+  throw new Error('webgl2/float unavailable');
+}
+
+// ---------------------------------------------------------------------------
+// Shared GLSL: 1) THE GLASS MODEL — a cut tumbler with a diamond-quilted wall.
+// The same surface functions drive photon refraction, the raymarched render,
+// and the shadows, so everything agrees about what the glass is.
+// ---------------------------------------------------------------------------
+const SHARED = `
+precision highp float;
+
+const float R0    = 0.240;  // outer radius at the base
+const float SLOPE = 0.060;  // the tumbler widens toward the top
+const float H     = 1.15;   // height
+const float NGLASS = 1.50;  // refractive indices
+const float NCOLA  = 1.34;
+const float CANOPY = 2.6;   // height of the leaf canopy casting dapple
+
+uniform float u_facet;      // facet depth multiplier
+uniform float u_wall;       // wall thickness scale (adjustable glassware depth)
+uniform float u_liq;        // cola fill height
+uniform float u_diam;       // diamond aspect: height vs width
+uniform float u_diamN;      // diamonds around the circumference
+uniform float u_cond;       // condensation intensity
+uniform float u_irr;        // manufacturing irregularity
+uniform vec3  u_colaSig;    // cola absorption spectrum (from the colour picker)
+uniform vec3  u_colaGlow;   // cola forward-scatter colour (derived)
+uniform vec3  u_glassSig;   // glass absorption spectrum (from the tint picker)
+
+float hash12(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453123); }
+vec2  hash22(vec2 p){
+  return fract(sin(vec2(dot(p,vec2(127.1,311.7)), dot(p,vec2(269.5,183.3))))*43758.5453);
+}
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f*f*(3.0-2.0*f);
+  return mix(mix(hash12(i),hash12(i+vec2(1,0)),f.x),
+             mix(hash12(i+vec2(0,1)),hash12(i+vec2(1,1)),f.x), f.y);
+}
+float fbm(vec2 p){
+  float v=0.0, a=0.5;
+  for(int i=0;i<4;i++){ v+=a*vnoise(p); p=p*2.03+vec2(17.3,9.1); a*=0.5; }
+  return v;
+}
+
+// real tumblers taper: chunky at the base, a fine thin lip at the top.
+// The thickness also wanders a little around the glass, like moulded or
+// hand-finished ware — nothing about a real wall is perfectly even.
+float wallAt(float th, float y){
+  float base = u_wall * mix(1.30, 0.25, smoothstep(0.0, H, y));
+  // sampled on the unit circle so the noise tiles seamlessly around the glass
+  vec2 c1 = vec2(cos(th), sin(th));
+  float irr = (vnoise(c1*1.4 + vec2(2.0 + y*1.1, y*2.4)) - 0.5)
+      + 0.5*(vnoise(c1*3.1 + vec2(8.3, y*5.1)) - 0.5);
+  return base * (1.0 + 0.28*u_irr*irr);
+}
+
+// --- condensation on the wall ------------------------------------------
+// s = (arc length around the glass, height). One droplet per grid cell,
+// randomly present, random size/offset -> mask + in-drop coords.
+vec4 dropLayer(vec2 s, float cell, float seed, float rare){
+  vec2 id = floor(s/cell);
+  float h1 = hash12(id + seed*3.17);
+  float h2 = hash12(id*2.3 + seed + 7.7);
+  vec2 rnd = hash22(id*1.71 + seed);
+  vec2 hh  = hash22(id*3.7 + seed + 4.2);
+
+  // clustered presence: patchy clumps, not a uniform sprinkle
+  float clump = fbm(id*cell*2.8 + seed) - 0.5;
+  float present = step(rare, h1 + 0.45*clump);
+
+  // power-law radii: p(r) ~ r^-2.2 between rmin..rmax (inverse-CDF sample)
+  float rmin = cell*0.075, rmax = cell*0.44;
+  float k = pow(rmin/rmax, 1.2);            // alpha-1 = 1.2
+  float r = rmin * pow(1.0 - h2*(1.0 - k), -1.0/1.2);
+
+  vec2 c = (id + 0.25 + 0.5*rnd)*cell;
+  vec2 dd = s - c;
+  // irregular blob: random aspect, gravity sag, lobed outline (merged drops)
+  dd.x *= 1.0 + 0.5*(hh.x - 0.5);
+  dd.y *= 0.72 + 0.35*hh.y;
+  float ang = atan(dd.y, dd.x);
+  float lump = 1.0 + 0.16*sin(ang*3.0 + hh.x*6.2831)
+                   + 0.11*sin(ang*5.0 + hh.y*6.2831);
+  float dist = length(dd)*lump;
+
+  float mask = present * smoothstep(r, r*0.66, dist);
+  return vec4(mask, dd/max(r,1e-5), r);
+}
+// misty film: strongest around the middle of the glass, patchy
+float mistAmount(vec2 s){
+  float band = smoothstep(0.02, 0.20, s.y) * smoothstep(0.95, 0.55, s.y);
+  float thm = s.x/0.27;                     // recover the angle; tile the fog
+  float blotch = 0.65 + 0.55*fbm(vec2(cos(thm), sin(thm))*1.6 + vec2(2.2, s.y*4.5));
+  return 0.62 * band * blotch * u_cond;
+}
+// trails where drops ran down and wiped the fog
+float rivulet(vec2 s){
+  float laneW = 0.075;
+  float lane = floor(s.x/laneW);
+  float on = step(0.45, hash12(vec2(lane, 3.3)));
+  float wig = (fbm(vec2(lane*7.7, s.y*2.4)) - 0.5)*laneW*1.1;
+  float cx = (lane + 0.5)*laneW + wig;
+  float w = laneW*(0.10 + 0.10*hash12(vec2(lane, 9.1)));
+  float tr = exp(-pow((s.x - cx)/w, 2.0));
+  float ys = 0.35 + 0.55*hash12(vec2(lane, 5.7));   // trail head; runs down from here
+  tr *= smoothstep(ys, ys - 0.08, s.y);
+  return on*tr;
+}
+
+// Diamond-quilt height field on the wall: two triangle waves in rotated
+// (helical) coordinates make a lattice of little pyramids = the cut facets.
+float facetPattern(float th, float y){
+  float m = u_diamN;             // diamonds around the circumference
+  // rows track the count so the aspect slider keeps its meaning
+  float rows = (3.0 * u_diamN/16.0) / max(u_diam, 0.2);
+  float a = th*(m/6.2831853) + y*rows;
+  float b = th*(m/6.2831853) - y*rows;
+  float ta = 1.0 - abs(fract(a)-0.5)*2.0;   // 1 at ridge, 0 at groove
+  float tb = 1.0 - abs(fract(b)-0.5)*2.0;
+  float d = min(ta, tb);         // flat pyramid faces, sharp ridges
+  float band = smoothstep(0.06, 0.18, y) * (1.0 - smoothstep(0.80, 0.97, y));
+  return d*band;
+}
+float outerRadius(float th, float y){
+  // slight manufacturing wobble: bends the facet streaks into tangled wisps
+  vec2 cw = vec2(cos(th), sin(th));
+  float wob = (vnoise(cw*1.6 + vec2(3.0 + y*0.9, y*2.6)) - 0.5)
+            + 0.5*(vnoise(cw*3.3 + vec2(9.2, y*5.3)) - 0.5);
+  // smaller diamonds are cut shallower, like real glassware
+  return R0 + SLOPE*y + u_facet*0.010*sqrt(16.0/u_diamN)*facetPattern(th, y) + 0.0035*u_irr*wob;
+}
+vec3 outerPos(float th, float y){
+  float r = outerRadius(th, y);
+  return vec3(cos(th)*r, y, sin(th)*r);
+}
+// numeric surface normal (outward)
+vec3 outerNormal(float th, float y){
+  float e = 0.006;
+  vec3 p0 = outerPos(th, y);
+  vec3 dth = outerPos(th+e, y) - p0;
+  vec3 dy  = outerPos(th, y+e) - p0;
+  return normalize(cross(dy, dth));
+}
+vec3 smoothNormal(float th){
+  // cone normal ignoring facets
+  vec3 rad = vec3(cos(th), 0.0, sin(th));
+  return normalize(rad - vec3(0.0, SLOPE, 0.0));
+}
+
+// ---------------------------------------------------------------------------
+// 2) THE LIGHTS — a few suns, really: gaps in the foliage. Each has its own
+// direction (swaying with the wind), colour, intensity, and its own drifting
+// leaf-shadow mask sampled up at the canopy plane.
+// ---------------------------------------------------------------------------
+const int NL = 3;
+uniform vec3  u_lightDir[NL];   // normalized, pointing DOWN into the scene
+uniform vec3  u_lightCol[NL];   // colour * intensity
+uniform vec2  u_dappleOff[NL];  // canopy drift
+uniform float u_leaf;
+
+float dapple(vec3 P, int li){
+  vec3 up = -u_lightDir[li];                      // toward the sun
+  vec2 cp = P.xz + up.xz * ((CANOPY - P.y)/max(up.y, 0.2));
+  float n1 = fbm(cp*0.55 + u_dappleOff[li]);
+  float n2 = fbm(cp*1.20 - u_dappleOff[li]*1.4 + 4.7);
+  float m = smoothstep(0.42, 0.60, n1*0.62 + n2*0.46);   // crisp-edged patches
+  return mix(1.0, 0.06 + 0.94*m, u_leaf);                // deep shade floor
+}
+`;
+
+// ---------------------------------------------------------------------------
+// 3) PHOTON TRANSPORT — each vertex is one photon from one light. It refracts
+// into a facet, crosses the wall, the interior (cola or air, with absorption),
+// the far wall, refracts out through the far facets, and lands on the table.
+// ---------------------------------------------------------------------------
+const PHOTON_VS = `#version 300 es
+${SHARED}
+uniform float u_time;
+uniform float u_soft;      // penumbra (sun angular size + leaf diffraction)
+uniform float u_mode;      // 0 = transmitted photons, 1 = Fresnel-reflected
+uniform float u_disp;      // dispersion strength
+const int GW = 512;
+const int GH = 288;
+const int PER = GW*GH;
+
+out vec3 v_col;
+
+void kill(){ gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 0.0; v_col = vec3(0.0); }
+
+void main(){
+  int id  = gl_VertexID;
+  int li  = id / PER;
+  int pid = id - li*PER;
+  vec2 uv = (vec2(float(pid % GW), float(pid / GW)) + 0.5) / vec2(float(GW), float(GH));
+
+  // dispersion: each photon carries a continuous wavelength. A wide,
+  // overlapping spectral response keeps each splat pastel, so colour only
+  // emerges where the folds systematically separate the wavelengths.
+  float lam = hash12(uv*991.7 + float(li)*3.3);
+  vec3 spec3 = vec3(
+    exp(-pow((lam - 0.18)/0.46, 2.0)),
+    exp(-pow((lam - 0.50)/0.46, 2.0)),
+    exp(-pow((lam - 0.82)/0.46, 2.0)));
+  vec3 chCol = spec3 * (3.0 / (spec3.r + spec3.g + spec3.b));
+  float nGl = 1.500 + (lam - 0.5)*0.014*u_disp;  // red bends least, blue most
+  float nCo = 1.340 + (lam - 0.5)*0.006*u_disp;
+
+  vec3 L = u_lightDir[li];
+
+  // stable per-photon jitter: fills gaps + models the sun's angular size
+  vec2 j  = hash22(uv*617.0 + float(li)*13.7) - 0.5;
+  vec2 j2 = hash22(uv*233.0 + float(li)*71.3) - 0.5;
+  uv += j / vec2(float(GW), float(GH));
+  vec3 Lj = normalize(L + vec3(j2.x, 0.0, j2.y) * u_soft);
+
+  // launch point: the sun-facing part of the wall
+  float azL = atan(-L.z, -L.x);
+  float th = azL + (uv.x - 0.5) * 2.6;
+  float y  = mix(0.05, 1.0, uv.y);
+
+  vec3 P1 = outerPos(th, y);
+  vec3 N1 = outerNormal(th, y);
+
+  // condensation: droplets act as extra little lenses on the entry wall,
+  // and the misty film scatters part of the beam away from the sharp caustic
+  vec2 cs = vec2(th*0.27, y);
+  vec4 Dp  = dropLayer(cs, 0.085, 3.0, 0.72);
+  vec4 Dp2 = dropLayer(cs + 13.1, 0.038, 17.0, 0.52);
+  vec4 Dp3 = dropLayer(cs + 31.7, 0.017, 41.0, 0.34);
+  if(Dp2.x > Dp.x) Dp = Dp2;
+  if(Dp3.x > Dp.x) Dp = Dp3;
+  Dp.x *= min(u_cond, 1.2);
+  if(Dp.x > 0.0){
+    vec3 T = normalize(vec3(-sin(th), 0.0, cos(th)));
+    N1 = normalize(N1 + (T*Dp.y + vec3(0.0,1.0,0.0)*Dp.z) * 0.35 * Dp.x);
+  }
+  float mistP = mistAmount(cs) * (1.0 - 0.8*Dp.x) * (1.0 - 0.85*rivulet(cs));
+
+  float face = dot(N1, -Lj);
+  if(face <= 0.02){ kill(); return; }
+
+  // occlusion by the leaves above
+  float w = face * dapple(P1, li);
+  if(w < 0.004){ kill(); return; }
+  w *= 1.0 - 0.40*mistP;
+
+  // Fresnel at entry
+  float c1 = abs(dot(N1, Lj));
+  float F = 0.04 + 0.96*pow(1.0 - c1, 5.0);
+
+  if(u_mode > 0.5){
+    // ---- the REFLECTION caustic: the energy the wall bounces off,
+    // landing as a bright arc on the sun side of the glass
+    vec3 dr = reflect(Lj, N1);
+    float wr = w * F;
+    if(dr.y > -0.03 || wr < 0.002){ kill(); return; }
+    float sr = -P1.y / dr.y;
+    if(sr > 6.0){ kill(); return; }
+    vec3 hitr = P1 + dr*sr;
+    gl_Position = vec4(hitr.x/1.7, (hitr.z - 0.8)/1.7, 0.0, 1.0);
+    gl_PointSize = 3.0;
+    v_col = u_lightCol[li] * wr;               // mirror bounce: achromatic
+    return;
+  }
+  w *= 1.0 - F;
+
+  // ---- refraction 1: air -> glass, at the faceted outer wall
+  vec3 d = refract(Lj, N1, 1.0/nGl);
+  if(dot(d,d) < 0.1){ kill(); return; }
+
+  float BH = 0.06 + u_wall*1.3;               // top of the solid base slab
+  if(y < BH){
+    // ---- the thick base: one solid chord straight through the slab
+    float ro2 = R0 + SLOPE*y;
+    float a0 = dot(d.xz, d.xz);
+    float b0 = 2.0*dot(P1.xz, d.xz);
+    float c0 = dot(P1.xz, P1.xz) - ro2*ro2;
+    float disc0 = b0*b0 - 4.0*a0*c0;
+    if(disc0 <= 0.0 || a0 < 1e-6){ kill(); return; }
+    float s0 = (-b0 + sqrt(disc0)) / (2.0*a0);
+    vec3 P4b = P1 + d*s0;
+    if(P4b.y < 0.005){ kill(); return; }
+    vec3 N4b = outerNormal(atan(P4b.z, P4b.x), clamp(P4b.y, 0.0, H));
+    vec3 db = refract(d, -N4b, nGl);
+    if(dot(db,db) < 0.1 || db.y > -0.03){ kill(); return; }
+    float sb = -P4b.y / db.y;
+    if(sb > 6.0){ kill(); return; }
+    vec3 hitb = P4b + db*sb;
+    gl_Position = vec4(hitb.x / 1.7, (hitb.z - 0.8) / 1.7, 0.0, 1.0);
+    gl_PointSize = 3.0;
+    v_col = u_lightCol[li] * exp(-s0*u_glassSig*1.6) * w * chCol;
+    return;
+  }
+
+  // cross the wall to the inner surface (smooth)
+  vec3 Ns = smoothNormal(th);
+  float t1 = wallAt(th, y) / max(dot(d, -Ns), 0.30);
+  vec3 P2 = P1 + d*t1;
+
+  // interior medium at this height
+  bool  inLiq = P2.y < u_liq;
+  float nIn = inLiq ? nCo : 1.0;
+
+  // ---- refraction 2: glass -> interior, inner wall (radial normal)
+  vec3 Nin = normalize(vec3(P2.x, 0.0, P2.z));
+  d = refract(d, Nin, nGl/nIn);
+  if(dot(d,d) < 0.1){ kill(); return; }   // total internal reflection
+
+  // cross the interior: chord to the far inner wall (cylinder approx)
+  float rIn = R0 + SLOPE*P2.y - wallAt(atan(P2.z, P2.x), P2.y);
+  float a = dot(d.xz, d.xz);
+  float b = 2.0*dot(P2.xz, d.xz);
+  float c = dot(P2.xz, P2.xz) - rIn*rIn;
+  float disc = b*b - 4.0*a*c;
+  if(disc <= 0.0 || a < 1e-6){ kill(); return; }
+  float s = (-b + sqrt(disc)) / (2.0*a);
+  if(s <= 0.0){ kill(); return; }
+  vec3 P3 = P2 + d*s;
+
+  vec3 tint = vec3(1.0);
+  if(inLiq){
+    // Beer-Lambert through the cola: long chords die, short ones turn amber
+    tint = exp(-s * u_colaSig * 0.45) * 0.6;
+  }
+  if(P3.y < 0.03){ kill(); return; }      // dives into the thick base
+
+  // ---- refraction 3: interior -> glass, far inner wall
+  vec3 Nin2 = -normalize(vec3(P3.x, 0.0, P3.z));
+  d = refract(d, Nin2, nIn/nGl);
+  if(dot(d,d) < 0.1){ kill(); return; }
+
+  // cross the far wall, exit through the faceted outer surface
+  float th4 = atan(P3.z, P3.x);
+  vec3 Ns2 = smoothNormal(th4);
+  float t2 = wallAt(th4, P3.y) / max(dot(d, Ns2), 0.30);
+  vec3 P4 = P3 + d*t2;
+  tint *= exp(-(t1 + t2)*u_glassSig);          // green shift grows with wall depth
+  float y4 = clamp(P4.y, 0.0, H);
+  vec3 N4 = outerNormal(atan(P4.z, P4.x), y4);
+
+  // ---- refraction 4: glass -> air
+  vec3 dout = refract(d, -N4, nGl);
+  if(dot(dout,dout) < 0.1){ kill(); return; }
+  float c4 = abs(dot(N4, dout));
+  w *= 1.0 - (0.04 + 0.96*pow(1.0 - c4, 5.0));
+
+  // ---- land on the table
+  if(dout.y > -0.03){ kill(); return; }
+  float s4 = -P4.y / dout.y;
+  if(s4 > 6.0){ kill(); return; }
+  vec3 hit = P4 + dout*s4;
+
+  // table region -> caustic-texture clip space
+  vec2 clip = vec2(hit.x / 1.7, (hit.z - 0.8) / 1.7);
+  gl_Position = vec4(clip, 0.0, 1.0);
+  gl_PointSize = 3.0;
+  v_col = u_lightCol[li] * tint * w * chCol;
+}
+`;
+
+const PHOTON_FS = `#version 300 es
+precision highp float;
+in vec3 v_col;
+out vec4 o;
+uniform float u_gain;
+void main(){
+  vec2 d = gl_PointCoord*2.0 - 1.0;
+  float g = exp(-dot(d,d)*3.0);
+  o = vec4(v_col * g * u_gain, 1.0);
+}
+`;
+
+// ---------------------------------------------------------------------------
+// fullscreen helpers: blur + composite
+// ---------------------------------------------------------------------------
+const QUAD_VS = `#version 300 es
+out vec2 v_uv;
+void main(){
+  vec2 p = vec2((gl_VertexID<<1 & 2), (gl_VertexID & 2));
+  v_uv = p;
+  gl_Position = vec4(p*2.0-1.0, 0.0, 1.0);
+}
+`;
+
+const BLUR_FS = `#version 300 es
+precision highp float;
+in vec2 v_uv; out vec4 o;
+uniform sampler2D u_tex;
+uniform vec2 u_dir;
+void main(){
+  vec3 acc = vec3(0.0);
+  float ws[5]; ws[0]=0.227; ws[1]=0.194; ws[2]=0.121; ws[3]=0.054; ws[4]=0.016;
+  acc += texture(u_tex, v_uv).rgb * ws[0];
+  for(int i=1;i<5;i++){
+    vec2 off = u_dir * float(i);
+    acc += texture(u_tex, v_uv + off).rgb * ws[i];
+    acc += texture(u_tex, v_uv - off).rgb * ws[i];
+  }
+  o = vec4(acc, 1.0);
+}
+`;
+
+// ---------------------------------------------------------------------------
+// 4) COMPOSITE — raymarch the same glass model, shade the table with the same
+// lights (shadow + dapple), and lay the accumulated caustic onto it.
+// ---------------------------------------------------------------------------
+const COMP_FS = `#version 300 es
+${SHARED}
+uniform vec2  u_res;
+uniform float u_time;
+uniform sampler2D u_caust;   // sharp
+uniform sampler2D u_caustB;  // blurred
+uniform float u_sun;
+uniform float u_spill;
+uniform vec3  u_ro;
+in vec2 v_uv;
+out vec4 o;
+
+// ---- water pooled at the base: ring + drip fingers -----------------------
+float finger(vec2 q, vec2 dir, float len, float wdt){
+  float t = dot(q, dir);
+  vec2 perp = vec2(-dir.y, dir.x);
+  float lat = dot(q, perp) + 0.013*sin(t*34.0 + dir.x*20.0);  // squiggle
+  float along = smoothstep(R0 + len, R0 + len*0.25, t)
+              * smoothstep(R0 - 0.03, R0 + 0.02, t);
+  return along * exp(-lat*lat/(wdt*wdt));
+}
+float puddleMask(vec2 q){
+  float r = length(q);
+  float w1 = fbm(q*3.3 + 7.1);
+  float outer = R0 + 0.005 + (0.030 + 0.150*u_spill)*pow(w1, 1.4);
+  float m = smoothstep(outer, outer - 0.040, r) * smoothstep(R0 - 0.05, R0 + 0.004, r);
+  float fs = smoothstep(0.10, 0.55, u_spill);
+  m = max(m, finger(q, normalize(vec2(0.55, 0.78)), 0.20, 0.020)*fs);
+  m = max(m, finger(q, normalize(vec2(-0.38, 0.86)), 0.13, 0.016)*fs);
+  m = max(m, finger(q, normalize(vec2(0.92, 0.30)), 0.10, 0.014)*fs*0.9);
+  // a stray drop that fell from the wall
+  m = max(m, smoothstep(0.026, 0.010, length(q - vec2(0.34, 0.30)))*fs);
+  return m;
+}
+
+// intersection with a rounded (filleted) convex edge, radius rc
+float roundedIntersect(float a, float b, float rc){
+  vec2 v = vec2(a + rc, b + rc);
+  return min(max(v.x, v.y), 0.0) + length(max(v, 0.0)) - rc;
+}
+float sdGlass(vec3 p){
+  if(p.y < -0.02 || p.y > H + 0.15) return max(p.y - H, -p.y) + 0.05;
+  float r = length(p.xz);
+  float th = atan(p.z, p.x);
+  float yc = clamp(p.y, 0.0, H);
+  float rcT = wallAt(th, H)*0.45;          // rim: half-round lip, kind to mouths
+  float rcB = 0.015;                       // bottom edge: just eased
+  float d = roundedIntersect(r - outerRadius(th, yc), p.y - H, rcT);
+  d = roundedIntersect(d, -p.y, rcB);
+  // hollow: carve the interior cavity, rounding the rim's inner edge too
+  float ri = R0 + SLOPE*yc - wallAt(th, yc);
+  float BH = 0.06 + u_wall*1.3;
+  float dCav = max(r - ri, BH - p.y);
+  return roundedIntersect(d, -dCav, rcT*0.8);
+}
+vec3 glassNormal(vec3 p){
+  const vec2 e = vec2(0.004, 0.0);
+  return normalize(vec3(
+    sdGlass(p+e.xyy) - sdGlass(p-e.xyy),
+    sdGlass(p+e.yxy) - sdGlass(p-e.yxy),
+    sdGlass(p+e.yyx) - sdGlass(p-e.yyx)));
+}
+
+vec3 envColor(vec3 d){
+  // --- procedural courtyard: blue sky, a green tree overhead, warm ground
+  float sky_t = smoothstep(-0.05, 0.60, d.y);
+  vec3 sky = mix(vec3(1.24, 1.23, 1.20),          // hazy blown-out horizon
+                 vec3(0.55, 0.74, 1.10)*1.05,     // blue reaching well down
+                 pow(sky_t, 0.55));
+  // the tree canopy: leaf clumps built from the SAME field that casts
+  // the dapple, so the reflected tree is the tree shading the table
+  if(d.y > 0.08){
+    vec2 cp = d.xz / max(d.y, 0.2) * (CANOPY*0.5);
+    float leaf  = fbm(cp*0.55 + u_dappleOff[0]);
+    float leaf2 = fbm(cp*1.20 - u_dappleOff[0]*1.4 + 4.7);
+    float gaps = smoothstep(0.34, 0.62, leaf*0.62 + leaf2*0.46);
+    float cover = smoothstep(0.10, 0.55, d.y) * (1.0 - gaps) * u_leaf;
+    vec3 leafCol = mix(vec3(0.10, 0.26, 0.06),    // shaded leaf
+                       vec3(0.42, 0.72, 0.18),    // sunlit leaf
+                       leaf2);
+    sky = mix(sky, leafCol*1.05, cover*0.85);
+  }
+  // suns: bright discs burning through the gaps, plus their glow
+  for(int i=0;i<NL;i++){
+    float a = max(dot(d, -u_lightDir[i]), 0.0);
+    sky += u_lightCol[i] * (pow(a, 600.0)*8.0 + pow(a, 24.0)*1.6);
+  }
+  // below the horizon: the sunlit dappled table, not a dim void
+  float gd = fbm(d.xz*2.5 + u_dappleOff[0]*0.5);
+  vec3 ground = mix(vec3(0.88, 0.86, 0.82), vec3(1.18, 1.15, 1.08),
+                    smoothstep(0.35, 0.65, gd));
+  return mix(ground, sky, smoothstep(-0.12, 0.04, d.y));
+}
+
+// how much sun from light li reaches table point P (glass blocks some)
+float glassShadow(vec3 P, int li){
+  vec3 up = -u_lightDir[li];
+  float occ = 0.0;
+  for(int i=0;i<10;i++){
+    float s = 0.10 + float(i)*0.26;
+    vec3 q = P + up*s;
+    if(q.y > H) break;
+    float rr = length(q.xz);
+    float R = R0 + SLOPE*q.y;
+    float pen = 0.03 + 0.06*s;                       // widening penumbra
+    float wgt = smoothstep(pen, -0.02, rr - R);
+    float dens = q.y < u_liq ? 0.95 : 0.70;            // cola blocks more
+    occ = max(occ, wgt*dens);
+  }
+  return 1.0 - occ;
+}
+
+void main(){
+  vec2 frag = (v_uv*2.0 - 1.0) * vec2(u_res.x/u_res.y, 1.0);
+
+  // orbit camera
+  vec3 ro = u_ro;
+  vec3 ta = vec3(0.0, 0.36, 0.0);
+  vec3 fw = normalize(ta - ro);
+  vec3 rt = normalize(cross(fw, vec3(0.0,1.0,0.0)));
+  vec3 upv = cross(rt, fw);
+  vec3 rd = normalize(fw*1.85 + rt*frag.x + upv*frag.y);
+
+  // does this ray meet the glass? (bounding cylinder first)
+  float tGlass = -1.0;
+  {
+    float rb = R0 + SLOPE*H + 0.06;
+    float a = dot(rd.xz, rd.xz);
+    float b = 2.0*dot(ro.xz, rd.xz);
+    float c = dot(ro.xz, ro.xz) - rb*rb;
+    float disc = b*b - 4.0*a*c;
+    if(disc > 0.0){
+      float s0 = (-b - sqrt(disc))/(2.0*a);
+      float s1 = (-b + sqrt(disc))/(2.0*a);
+      float t = max(s0, 0.0);
+      for(int i=0;i<80;i++){
+        if(t > s1) break;
+        vec3 p = ro + rd*t;
+        float d = sdGlass(p);
+        if(d < 0.0015){ tGlass = t; break; }
+        t += max(d*0.55, 0.002);
+      }
+    }
+  }
+
+  float tTable = (rd.y < -0.001) ? -ro.y/rd.y : 1e5;
+
+  // the cola's open surface, seen directly through the rim from above
+  float tLiq = 1e5;
+  if(rd.y < -0.001){
+    float tl = (u_liq - ro.y)/rd.y;
+    if(tl > 0.0){
+      vec3 ql = ro + rd*tl;
+      float rL = R0 + SLOPE*u_liq - wallAt(atan(ql.z, ql.x), u_liq);
+      if(length(ql.xz) < rL) tLiq = tl;
+    }
+  }
+
+  vec3 col;
+  if(tGlass > 0.0 && tGlass < min(tTable, tLiq)){
+    // ---------- the glass itself ----------
+    vec3 P = ro + rd*tGlass;
+    vec3 N = glassNormal(P);
+    float fres = 0.04 + 0.96*pow(clamp(1.0 + dot(rd, N), 0.0, 1.0), 5.0);
+    vec3 refl = envColor(reflect(rd, N));
+
+    // ---------- transmission with real wall depth ----------
+    vec3 body;
+    float th = atan(P.z, P.x);
+    float BH = 0.06 + u_wall*1.3;
+    float glassLen = 0.0;                       // path length inside glass
+    vec3 d1 = refract(rd, N, 1.0/NGLASS);
+
+    vec3 radial = normalize(vec3(P.x, 0.0, P.z));
+    bool innerHit = dot(N, radial) < -0.15 && P.y > BH;
+
+    if(dot(d1,d1) < 0.1){
+      body = envColor(reflect(rd, N));
+    } else if(innerHit){
+      // the INSIDE face of the far wall, seen through the opening:
+      // thin glass — mostly transmits the world behind it, distorted by
+      // its facets; the grazing Fresnel below silvers it toward the edges
+      float fp = facetPattern(th, clamp(P.y, 0.0, H));
+      glassLen = wallAt(th, clamp(P.y, 0.0, H))/0.7;
+      body = envColor(normalize(d1)) * vec3(0.93, 0.95, 0.93) * (0.72 + 0.30*fp);
+    } else if(P.y < BH){
+      // the thick solid base slab: one long chord of glass
+      float ro2 = R0 + SLOPE*P.y;
+      float a0 = dot(d1.xz, d1.xz);
+      float b0 = 2.0*dot(P.xz, d1.xz);
+      float c0 = dot(P.xz, P.xz) - ro2*ro2;
+      float disc0 = max(b0*b0 - 4.0*a0*c0, 0.0);
+      glassLen = (-b0 + sqrt(disc0)) / max(2.0*a0, 1e-4);
+      body = envColor(normalize(d1)) * (0.85 + 0.55*fbm(vec2(th*6.0, P.y*20.0)));
+      // amber wash where the slab carries light from the cola above it
+      body = mix(body, u_colaGlow*0.95, 0.35*smoothstep(BH - 0.05, BH, P.y));
+    } else {
+      // cross the front wall
+      vec3 Ns = smoothNormal(th);
+      float t1 = wallAt(th, P.y) / max(dot(d1, -Ns), 0.25);
+      glassLen += t1;
+      vec3 P2 = P + d1*t1;
+      vec3 Nin = normalize(vec3(P2.x, 0.0, P2.z));
+      float rIn = R0 + SLOPE*P2.y - wallAt(atan(P2.z, P2.x), P2.y);
+
+      if(P2.y < u_liq){
+        // The liquid COLUMN sits inside the clear wall. Refract glass->cola
+        // and filter the background by the true chord through the liquid.
+        vec3 d2 = refract(d1, Nin, NGLASS/NCOLA);
+        if(dot(d2,d2) < 0.1){
+          // TIR at the glass/cola interface: neutral clear-glass edge band
+          body = envColor(reflect(d1, Nin)) * 0.45;
+        } else {
+          float a0 = dot(d2.xz, d2.xz);
+          float b0 = 2.0*dot(P2.xz, d2.xz);
+          float c0 = dot(P2.xz, P2.xz) - rIn*rIn;
+          float disc0 = max(b0*b0 - 4.0*a0*c0, 0.0);
+          float chord = (-b0 + sqrt(disc0)) / max(2.0*a0, 1e-4);
+          // caramel: red survives, green and blue die together -> maroon
+          vec3 absorb = exp(-chord * u_colaSig);
+          glassLen += wallAt(atan(P2.z, P2.x), P2.y)/0.7;   // exit far wall
+          body = envColor(normalize(d2)) * vec3(0.94, 0.96, 0.94) * absorb
+               + vec3(0.014, 0.007, 0.008);
+          for(int i=0;i<NL;i++){
+            float fwd = pow(max(dot(rd, u_lightDir[i]), 0.0), 5.0);
+            body += u_colaGlow * fwd * u_lightCol[i]
+                  * (absorb + 0.12) * 0.8 * dapple(P, i);
+          }
+          float rimt = pow(clamp(1.0 - abs(dot(rd, N)), 0.0, 1.0), 2.5);
+          body += u_colaGlow * 0.42 * rimt * 0.8;
+          // bright meniscus line, seen refracted through the front wall
+          body += vec3(0.95, 0.88, 0.75)
+                * exp(-pow((u_liq - P2.y)/0.014, 2.0)) * (0.15 + 0.45*dapple(P, 0));
+        }
+      } else {
+        // empty part: cross the air gap and meet the BACK wall
+        vec3 d2 = refract(d1, Nin, NGLASS);
+        if(dot(d2,d2) < 0.1){
+          // total internal reflection in the front wall:
+          // the dark mirror band hugging the silhouette edges
+          body = envColor(reflect(d1, Nin)) * 0.45;
+        } else {
+          float a0 = dot(d2.xz, d2.xz);
+          float b0 = 2.0*dot(P2.xz, d2.xz);
+          float c0 = dot(P2.xz, P2.xz) - rIn*rIn;
+          float disc0 = max(b0*b0 - 4.0*a0*c0, 0.0);
+          float chord = (-b0 + sqrt(disc0)) / max(2.0*a0, 1e-4);
+          float sLiq = 1e5;
+          if(d2.y < -1e-4) sLiq = (u_liq - P2.y)/d2.y;
+          glassLen += wallAt(atan(P2.z, P2.x), P2.y)/0.7;   // back wall
+          if(sLiq < chord){
+            // the ray dips onto the cola's top surface inside the glass.
+            // Seen through the wall this is mostly sheen: the surface mirrors
+            // the bright sky, and the wall itself scatters — only a soft
+            // darkening of the transmitted background remains.
+            vec3 rl = reflect(d2, vec3(0.0, 1.0, 0.0));
+            float frl = 0.02 + 0.98*pow(clamp(1.0 + d2.y, 0.0, 1.0), 5.0);
+            vec3 deep2 = exp(-u_colaSig*0.30)*0.25 + vec3(0.016, 0.010, 0.008);
+            vec3 surf = mix(deep2, envColor(rl)*0.90, clamp(frl + 0.22, 0.0, 1.0));
+            body = mix(surf, envColor(normalize(d2)) * vec3(0.94, 0.96, 0.94), 0.35);
+          } else {
+            vec3 P3 = P2 + d2*chord;
+            vec3 Nb = -normalize(vec3(P3.x, 0.0, P3.z));  // back wall, inner face
+            float backFacet = facetPattern(atan(P3.z, P3.x), clamp(P3.y, 0.0, H));
+            body = envColor(normalize(d2)) * vec3(0.94, 0.96, 0.94)
+                 * (0.85 + 0.32*backFacet);     // the far diamonds show through
+            // Fresnel off the back wall: the silvery mirror arcs that hug
+            // the inner silhouette of a real glass
+            float cosb = clamp(dot(-d2, Nb), 0.0, 1.0);
+            float Fb = 0.04 + 0.96*pow(1.0 - cosb, 5.0);
+            body = mix(body, envColor(reflect(d2, Nb))*0.9, Fb*0.85);
+          }
+        }
+      }
+    }
+    // green-grey shift that grows with the glass path: the depth read
+    body *= exp(-glassLen * u_glassSig);
+
+    // ---------- condensation ----------
+    vec3 bodyBase = body;                        // the sharp, un-fogged view
+    vec2 s = vec2(th*0.27, P.y);                 // wall coordinates
+
+    float rv  = rivulet(s) * smoothstep(0.05, 0.5, u_cond);
+    vec4 Dr = dropLayer(s, 0.085, 3.0, 0.72);          // rare big blobs
+    vec4 Dm = dropLayer(s + 13.1, 0.038, 17.0, 0.52);  // mid drops
+    vec4 Df = dropLayer(s + 31.7, 0.017, 41.0, 0.34);  // dense micro-beads
+    if(Dm.x > Dr.x) Dr = Dm;
+    if(Df.x > Dr.x) Dr = Df;
+    float dm = Dr.x;
+    dm *= smoothstep(1.06, 0.88, P.y) * (1.0 - 0.7*rv);   // dry near rim & on trails
+    dm *= min(u_cond, 1.2);
+
+    bool onCola = P.y < u_liq + 0.015;
+    float mist = mistAmount(s) * (1.0 - 0.85*rv) * (1.0 - 0.80*dm);
+    if(onCola) mist *= 0.65;
+    mist = clamp(mist, 0.0, 1.0);
+    if(innerHit){ mist *= 0.40; dm *= 0.30; }   // the fog sits on the OUTER wall
+
+    // fog film: bright hazy scatter that kills contrast
+    float amb = 0.5 + 0.5*dapple(P, 0);
+    vec3 frost = mix(vec3(0.83,0.86,0.87), vec3(1.02,1.04,0.99), fbm(s*22.0)*0.7) * amb
+               * mix(vec3(1.0), vec3(0.94, 1.02, 0.95), 0.5*u_leaf);
+    if(onCola) frost *= vec3(0.52, 0.47, 0.46);           // haze over dark liquid stays dim
+    body = mix(body, body*0.30 + frost*0.70, mist);
+
+    // rivulets wipe back to the sharp view — wet glass, slightly darker
+    body = mix(body, bodyBase*0.92, rv*0.85);
+
+    // droplets: tiny lenses — bent background, dark rim, sun glint
+    vec3 Nd = N;
+    if(dm > 0.001){
+      vec2 nd = Dr.yz;
+      vec3 T = normalize(vec3(-sin(th), 0.0, cos(th)));
+      float nz = sqrt(max(1.0 - dot(nd,nd), 0.0));
+      Nd = normalize(N*nz + (T*nd.x + vec3(0.0,1.0,0.0)*nd.y)*0.9);
+      // a droplet shows a bent view of whatever is actually behind the wall,
+      // plus a faint ambient sheen — never brighter than its background allows
+      vec3 lens = bodyBase*0.70 + envColor(refract(rd, Nd, 0.75))*0.20
+                + vec3(0.10, 0.095, 0.09)*amb;
+      float rimd = smoothstep(0.45, 0.95, length(nd));
+      lens *= 1.0 - 0.35*rimd;
+      body = mix(body, lens, dm*0.80);
+    }
+
+    // fog also dulls the mirror reflection
+    col = mix(body, refl, fres*(0.85 - 0.45*mist));
+
+    // facet sparkles + droplet glints from each light
+    for(int i=0;i<NL;i++){
+      vec3 hr = reflect(u_lightDir[i], N);
+      col += u_lightCol[i] * pow(max(dot(hr, -rd), 0.0), 90.0) * 2.0 * dapple(P, i) * (1.0 - 0.6*mist);
+      vec3 hd = reflect(u_lightDir[i], Nd);
+      col += u_lightCol[i] * pow(max(dot(hd, -rd), 0.0), 160.0) * 5.0 * dm * dapple(P, i);
+    }
+  }else if(tLiq < tTable){
+    // ---------- the open cola surface ----------
+    vec3 Pl = ro + rd*tLiq;
+    vec2 rip = vec2(fbm(Pl.xz*26.0 + u_time*0.5), fbm(Pl.xz*26.0 + 9.0 - u_time*0.4)) - 0.5;
+    vec3 Nl = normalize(vec3(rip.x*0.06, 1.0, rip.y*0.06));
+    float frl = 0.02 + 0.98*pow(clamp(1.0 + dot(rd, Nl), 0.0, 1.0), 5.0);
+    // deep maroon, lifted by the broad sky-dome sheen a liquid always carries
+    vec3 deep = exp(-u_colaSig*0.30)*0.30 + vec3(0.018, 0.011, 0.009);
+    col = mix(deep, envColor(reflect(rd, Nl))*0.85, clamp(frl + 0.05, 0.0, 1.0));
+    for(int i=0;i<NL;i++){
+      vec3 hr = reflect(u_lightDir[i], Nl);
+      col += u_lightCol[i] * pow(max(dot(hr, -rd), 0.0), 300.0) * 2.0 * dapple(Pl, i);
+    }
+    // bright meniscus ring where the surface climbs the inner wall
+    float rL = R0 + SLOPE*u_liq - wallAt(atan(Pl.z, Pl.x), u_liq);
+    col += vec3(0.55, 0.50, 0.42)*exp(-pow((rL - length(Pl.xz))/0.012, 2.0))*0.5;
+  }else if(tTable < 1e4){
+    // ---------- the table ----------
+    vec3 P = ro + rd*tTable;
+
+    vec3 albedo = vec3(0.88, 0.87, 0.865);
+    albedo *= 0.96 + 0.07*fbm(P.xz*2.6);          // faint stone mottle
+
+    // ambient: blue skylight filtered through green leaves
+    vec3 light = mix(vec3(0.24, 0.28, 0.37), vec3(0.20, 0.31, 0.17), 0.55*u_leaf);
+    for(int i=0;i<NL;i++){
+      light += u_lightCol[i] * dapple(P, i) * glassShadow(P, i) * 1.10;
+    }
+    col = albedo * light * u_sun;
+
+    // contact occlusion at the base
+    float rr = length(P.xz);
+    col *= 1.0 - 0.42*exp(-max(rr - R0, 0.0)*9.0);
+
+    // ---------- water pooled at the base ----------
+    float pm = 0.0; vec2 pg = vec2(0.0);
+    if(rr < 0.55){
+      pm = puddleMask(P.xz);
+      if(pm > 0.002){
+        float pe = 0.006;
+        pg = vec2(puddleMask(P.xz + vec2(pe,0.0)) - puddleMask(P.xz - vec2(pe,0.0)),
+                  puddleMask(P.xz + vec2(0.0,pe)) - puddleMask(P.xz - vec2(0.0,pe))) / (2.0*pe);
+        col *= 1.0 - 0.20*pm;                    // wet stone is darker
+      }
+    }
+
+    // ---------- THE CAUSTIC ----------
+    vec2 wig = clamp(pg, -3.0, 3.0) * pm * 0.004; // the film bends it slightly
+    vec2 cuv = vec2((P.x + wig.x)/1.7, (P.z + wig.y - 0.8)/1.7)*0.5 + 0.5;
+    if(all(greaterThan(cuv, vec2(0.0))) && all(lessThan(cuv, vec2(1.0)))){
+      vec3 sharp = texture(u_caust,  cuv).rgb;
+      vec3 soft  = texture(u_caustB, cuv).rgb;
+      col += (sharp*0.95 + soft*0.75) * u_sun;
+    }
+    // water surface on top: sky mirror at the meniscus, glints, edge caustic
+    if(pm > 0.002){
+      vec3 Nw = normalize(vec3(-pg.x*0.018, 1.0, -pg.y*0.018));
+      float fr = 0.02 + 0.98*pow(clamp(1.0 + dot(rd, Nw), 0.0, 1.0), 5.0);
+      col = mix(col, envColor(reflect(rd, Nw)), fr*pm*0.85);
+      for(int i=0;i<NL;i++){
+        vec3 hr = reflect(u_lightDir[i], Nw);
+        col += u_lightCol[i] * pow(max(dot(hr, -rd), 0.0), 240.0) * 4.0 * pm * dapple(P, i);
+        // meniscus focuses sun onto the down-sun rim: bright wiggly line
+        float ec = max(dot(normalize(pg + 1e-5), -normalize(u_lightDir[i].xz + 1e-5)), 0.0);
+        col += u_lightCol[i] * ec * length(pg) * 0.020 * pm * dapple(P, i) * glassShadow(P, i);
+      }
+    }
+
+    // fade the far table into the blown-out backdrop
+    col = mix(col, vec3(1.15,1.14,1.11), smoothstep(4.0, 12.0, tTable));
+  }else{
+    // the backdrop is the environment, but overexposed like the video
+    col = mix(envColor(rd), vec3(1.20, 1.19, 1.16), 0.45);
+  }
+
+  // finish: vignette, filmic-ish curve, grain
+  vec2 vq = v_uv - 0.5;
+  col *= 1.0 - 0.35*dot(vq, vq)*1.6;
+  col = col / (1.0 + col*0.35);
+  col = pow(max(col, 0.0), vec3(0.90));
+  col += (hash12(gl_FragCoord.xy + fract(u_time)*61.7) - 0.5)*0.02;
+  o = vec4(col, 1.0);
+}
+`;
+
+// ---------------------------------------------------------------------------
+// GL plumbing
+// ---------------------------------------------------------------------------
+function mkProg(vs, fs){
+  const c = (t, s) => {
+    const sh = gl.createShader(t);
+    gl.shaderSource(sh, s); gl.compileShader(sh);
+    if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS))
+      throw new Error(gl.getShaderInfoLog(sh) + '\n---\n' + s.split('\n').map((l,i)=>`${i+1}: ${l}`).join('\n'));
+    return sh;
+  };
+  const p = gl.createProgram();
+  gl.attachShader(p, c(gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, c(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if(!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  return p;
+}
+function mkTarget(w, h){
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return { tex, fb, w, h };
+}
+
+const photonProg = mkProg(PHOTON_VS, PHOTON_FS);
+const blurProg   = mkProg(QUAD_VS, BLUR_FS);
+const compProg   = mkProg(QUAD_VS, COMP_FS);
+
+const CAUST = 1024, BLUR = 512;
+const caust = mkTarget(CAUST, CAUST);
+const blurA = mkTarget(BLUR, BLUR);
+const blurB = mkTarget(BLUR, BLUR);
+
+const GW = 512, GH = 288, NL = 3;
+const NPHOT = GW*GH*NL;
+
+const vao = gl.createVertexArray();  // attribute-less; gl_VertexID does the work
+gl.bindVertexArray(vao);
+
+const U = p => new Proxy({}, { get: (_, n) => gl.getUniformLocation(p, n) });
+const uP = U(photonProg), uB = U(blurProg), uC = U(compProg);
+
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  canvas.width  = Math.floor(innerWidth*dpr);
+  canvas.height = Math.floor(innerHeight*dpr);
+}
+addEventListener('resize', resize); resize();
+
+let mouse = [0.5, 0.5], sm = [0.5, 0.5];
+addEventListener('pointermove', e => { mouse = [e.clientX/innerWidth, e.clientY/innerHeight]; });
+
+const $ = id => document.getElementById(id);
+
+// hex colour -> linear rgb -> Beer-Lambert absorption spectrum
+function hexLin(hex){
+  return [1,3,5].map(i => Math.pow(Math.max(parseInt(hex.slice(i,i+2),16)/255, 0.02), 2.2));
+}
+function sigFrom(hex, refLen){
+  return hexLin(hex).map(v => -Math.log(v)/refLen);
+}
+
+// smooth 1D noise: incommensurate sines, roughly in [-1, 1]
+const snz = (t, s) => 0.55*Math.sin(t + s) + 0.30*Math.sin(t*2.17 + s*1.7 + 1.3)
+                    + 0.15*Math.sin(t*4.71 + s*0.9 + 4.1);
+
+// ---------------------------------------------------------------------------
+// CICADAS — procedural, matched to the video's audio analysis:
+// noise band centred ~4.7 kHz, gated by ~200 Hz click trains (several
+// insects at slightly different rates beating together), slow chorus swell.
+// ---------------------------------------------------------------------------
+let AU = null;
+function buildAudio(){
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const master = ctx.createGain(); master.gain.value = 0.0;
+  const comp = ctx.createDynamicsCompressor();
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 9000;
+  master.connect(comp); comp.connect(lp); lp.connect(ctx.destination);
+
+  // shared looping white-noise buffer
+  const nbuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate);
+  const nd = nbuf.getChannelData(0);
+  for(let i=0;i<nd.length;i++) nd[i] = Math.random()*2 - 1;
+
+  const pulseCurve = new Float32Array(256);   // sine -> spiky click pulses
+  for(let i=0;i<256;i++){ const x = i/255*2 - 1; pulseCurve[i] = Math.pow(Math.max(x,0), 6); }
+
+  // three near cicadas. Measured: click trains ~112 Hz, energy 4.3-5.3 kHz,
+  // and the whole song surging at ~5 Hz (the orni "cha-cha-cha")
+  const voices = [
+    { rate: 112, freq: 4550, pan: -0.5, lvl: 0.42, lfo: 0.11, surge: 5.1, sph: 0.0 },
+    { rate: 108, freq: 5050, pan:  0.4, lvl: 0.34, lfo: 0.07, surge: 4.7, sph: 2.1 },
+    { rate: 117, freq: 4800, pan:  0.1, lvl: 0.27, lfo: 0.16, surge: 5.4, sph: 4.2 },
+  ];
+  const t0 = ctx.currentTime;
+  for(const v of voices){
+    const src = ctx.createBufferSource(); src.buffer = nbuf; src.loop = true;
+    src.playbackRate.value = 0.97 + Math.random()*0.06;
+    const bp1 = ctx.createBiquadFilter(); bp1.type='bandpass'; bp1.frequency.value=v.freq; bp1.Q.value=3.0;
+    const bp2 = ctx.createBiquadFilter(); bp2.type='bandpass'; bp2.frequency.value=v.freq*1.02; bp2.Q.value=3.4;
+    // click-train gate
+    const gate = ctx.createGain(); gate.gain.value = 0.05;
+    const osc = ctx.createOscillator(); osc.frequency.value = v.rate;
+    const shp = ctx.createWaveShaper(); shp.curve = pulseCurve;
+    const oscG = ctx.createGain(); oscG.gain.value = 1.3;
+    osc.connect(shp); shp.connect(oscG); oscG.connect(gate.gain);
+    // the ~5 Hz surge that gives the song its cha-cha-cha pulse
+    const surge = ctx.createGain(); surge.gain.value = 0.68;
+    const so = ctx.createOscillator(); so.frequency.value = v.surge;
+    const soG = ctx.createGain(); soG.gain.value = 0.30;
+    so.connect(soG); soG.connect(surge.gain);
+    so.start(t0 + v.sph/10);
+    // slow individual swell
+    const swell = ctx.createGain(); swell.gain.value = 0.75;
+    const lfo = ctx.createOscillator(); lfo.frequency.value = v.lfo;
+    const lfoG = ctx.createGain(); lfoG.gain.value = 0.25;
+    lfo.connect(lfoG); lfoG.connect(swell.gain);
+    const pan = ctx.createStereoPanner(); pan.pan.value = v.pan;
+    const out = ctx.createGain(); out.gain.value = v.lvl;
+    src.connect(bp1); bp1.connect(bp2); bp2.connect(gate);
+    gate.connect(surge); surge.connect(swell); swell.connect(pan); pan.connect(out); out.connect(master);
+    src.start(); osc.start(); lfo.start();
+  }
+
+  // distant chorus bed: wider band, gentle 30 Hz roughness, no clear clicks
+  {
+    const src = ctx.createBufferSource(); src.buffer = nbuf; src.loop = true;
+    src.playbackRate.value = 1.01;
+    const bp = ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=4800; bp.Q.value=0.9;
+    const gate = ctx.createGain(); gate.gain.value = 0.75;
+    const osc = ctx.createOscillator(); osc.frequency.value = 31;
+    const oscG = ctx.createGain(); oscG.gain.value = 0.20;
+    osc.connect(oscG); oscG.connect(gate.gain);
+    const out = ctx.createGain(); out.gain.value = 0.16;
+    src.connect(bp); bp.connect(gate); gate.connect(out); out.connect(master);
+    src.start(); osc.start();
+  }
+
+  // leaf rustle bed, driven by the wind + gusts from the render loop
+  const rustle = ctx.createGain(); rustle.gain.value = 0.0;
+  {
+    const src = ctx.createBufferSource(); src.buffer = nbuf; src.loop = true;
+    src.playbackRate.value = 0.5;
+    const lp2 = ctx.createBiquadFilter(); lp2.type='lowpass'; lp2.frequency.value=1600;
+    const hp = ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=300;
+    src.connect(lp2); lp2.connect(hp); hp.connect(rustle); rustle.connect(master);
+    src.start();
+  }
+  return { ctx, master, rustle };
+}
+const audioBtn = document.getElementById('audioBtn');
+audioBtn.addEventListener('click', () => {
+  if(!AU){ AU = buildAudio(); }
+  if(AU.ctx.state === 'suspended') AU.ctx.resume();
+  const on = audioBtn.classList.toggle('on');
+  AU.master.gain.setTargetAtTime(on ? 0.45 : 0.0, AU.ctx.currentTime, 0.4);
+  audioBtn.textContent = on ? '🔊 cicadas' : '🔈 cicadas';
+});
+
+const start = performance.now();
+function frame(){
+  const t = (performance.now() - start)/1000;
+  sm[0] += (mouse[0]-sm[0])*0.05;
+  sm[1] += (mouse[1]-sm[1])*0.05;
+
+  const wind  = parseFloat($('wind').value);
+  const facet = parseFloat($('facet').value);
+  const wallv = parseFloat($('wall').value);
+  const liq   = parseFloat($('liq').value);
+  const diam  = parseFloat($('diam').value);
+  const cond  = parseFloat($('cond').value);
+  const colaSig = sigFrom($('colaCol').value, 0.35);
+  const colaLin = hexLin($('colaCol').value);
+  const colaGlow = [1,
+    Math.pow(Math.max(colaLin[1]/colaLin[0], 1e-3), 0.33),
+    Math.pow(Math.max(colaLin[2]/colaLin[0], 1e-3), 0.33) * 0.55];
+  const glassSig = sigFrom($('glassCol').value, 0.30);
+  const setShared = (u) => {
+    gl.uniform1f(u.u_liq, liq);
+    gl.uniform1f(u.u_diam, diam);
+    gl.uniform1f(u.u_diamN, parseFloat($('diamN').value));
+    gl.uniform1f(u.u_cond, cond);
+    gl.uniform1f(u.u_irr, parseFloat($('irr').value));
+    gl.uniform3f(u.u_colaSig, ...colaSig);
+    gl.uniform3f(u.u_colaGlow, ...colaGlow);
+    gl.uniform3f(u.u_glassSig, ...glassSig);
+  };
+  const leaf  = parseFloat($('leaf').value);
+  const sun   = parseFloat($('sun').value);
+  const tw = t*wind;
+
+  // ---- the lights: one main sun-gap and two secondary gaps in the foliage
+  const azBase = -1.95;                             // sun fixed behind the glass
+  const elBase = 0.60;                              // and low: long caustic thrown forward
+  const dirs = [], cols = [], offs = [];
+  const spec = [
+    { daz: 0.00, del: 0.00, int: 1.00, col: [1.06, 1.00, 0.90], ph: 0.0 },
+    { daz: 0.38, del:-0.08, int: 0.22, col: [0.97, 1.01, 0.92], ph: 3.1 },
+    { daz:-0.45, del: 0.10, int: 0.15, col: [0.94, 0.98, 1.04], ph: 7.4 },
+  ];
+  // gusts: a slow irregular envelope that decides how hard the leaves flutter
+  const gust = 0.30 + 0.70*Math.pow(0.5 + 0.5*snz(tw*0.16, 2.0), 1.6);
+  for(let i=0;i<NL;i++){
+    const s = spec[i];
+    // slow branch-sway + fast gust-driven leaf flutter
+    const az = azBase + s.daz + wind*(0.055*snz(tw*0.45, s.ph)
+                                    + 0.020*gust*snz(tw*1.5, s.ph*2.3));
+    const el = elBase + s.del + wind*(0.028*snz(tw*0.33, s.ph*1.7)
+                                    + 0.011*gust*snz(tw*2.0, s.ph*3.1));
+    // direction FROM sun INTO scene
+    const d = [ -Math.cos(az)*Math.cos(el), -Math.sin(el), -Math.sin(az)*Math.cos(el) ];
+    const n = Math.hypot(...d);
+    dirs.push(d[0]/n, d[1]/n, d[2]/n);
+    // brightness: slow occlusion breathing x fast gusty shimmer
+    const f = (0.62 + 0.38*(0.5 + 0.5*snz(tw*0.7, s.ph*7.1)))
+            * (0.88 + 0.12*gust*snz(tw*2.4, s.ph*3.3));
+    cols.push(s.col[0]*s.int*f, s.col[1]*s.int*f, s.col[2]*s.int*f);
+    // canopy drift + sway + flutter
+    offs.push(
+      tw*0.055 + 0.05*snz(tw*0.28, s.ph) + 0.013*gust*snz(tw*1.3, s.ph*1.9) + s.ph*2.0,
+      -tw*0.023 + 0.05*snz(tw*0.24, s.ph + 2.0) + 0.013*gust*snz(tw*1.7, s.ph*1.3));
+  }
+
+  // audio follows the weather: rustle rides the gusts
+  if(AU && audioBtn.classList.contains('on')){
+    AU.rustle.gain.setTargetAtTime(0.030*wind*(0.4 + 0.8*gust), AU.ctx.currentTime, 0.15);
+  }
+
+  // ---- pass 1: trace photons into the caustic buffer
+  gl.bindFramebuffer(gl.FRAMEBUFFER, caust.fb);
+  gl.viewport(0, 0, CAUST, CAUST);
+  gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+  gl.useProgram(photonProg);
+  gl.uniform3fv(uP.u_lightDir, dirs);
+  gl.uniform3fv(uP.u_lightCol, cols);
+  gl.uniform2fv(uP.u_dappleOff, offs);
+  gl.uniform1f(uP.u_leaf, leaf);
+  gl.uniform1f(uP.u_facet, facet);
+  gl.uniform1f(uP.u_wall, wallv);
+  setShared(uP);
+  gl.uniform1f(uP.u_time, t);
+  gl.uniform1f(uP.u_soft, 0.012 + 0.010*wind);
+  gl.uniform1f(uP.u_gain, 0.22);
+  gl.uniform1f(uP.u_disp, parseFloat($('disp').value));
+  gl.uniform1f(uP.u_mode, 0);            // transmitted photons
+  gl.drawArrays(gl.POINTS, 0, NPHOT);
+  gl.uniform1f(uP.u_mode, 1);            // Fresnel-reflected photons
+  gl.drawArrays(gl.POINTS, 0, NPHOT);
+  gl.disable(gl.BLEND);
+
+  // ---- pass 2: blur for the soft halo
+  gl.useProgram(blurProg);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, blurA.fb);
+  gl.viewport(0, 0, BLUR, BLUR);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, caust.tex);
+  gl.uniform1i(uB.u_tex, 0);
+  gl.uniform2f(uB.u_dir, 2.0/BLUR, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, blurB.fb);
+  gl.bindTexture(gl.TEXTURE_2D, blurA.tex);
+  gl.uniform2f(uB.u_dir, 0, 2.0/BLUR);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  // ---- pass 3: composite the scene
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.useProgram(compProg);
+  gl.uniform2f(uC.u_res, canvas.width, canvas.height);
+  gl.uniform1f(uC.u_time, t);
+  gl.uniform3fv(uC.u_lightDir, dirs);
+  gl.uniform3fv(uC.u_lightCol, cols);
+  gl.uniform2fv(uC.u_dappleOff, offs);
+  gl.uniform1f(uC.u_leaf, leaf);
+  gl.uniform1f(uC.u_facet, facet);
+  gl.uniform1f(uC.u_wall, wallv);
+  setShared(uC);
+  gl.uniform1f(uC.u_sun, sun);
+  gl.uniform1f(uC.u_spill, parseFloat($('spill').value));
+  // orbit camera from the mouse
+  const caz = (sm[0]-0.5)*2.6;
+  const ch  = 0.30 + (1.0-sm[1])*2.50;   // table level up to a top-down view
+  gl.uniform3f(uC.u_ro, Math.sin(caz)*2.05, ch, Math.cos(caz)*2.05);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, caust.tex);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, blurB.tex);
+  gl.uniform1i(uC.u_caust, 0);
+  gl.uniform1i(uC.u_caustB, 1);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

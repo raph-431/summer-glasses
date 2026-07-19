@@ -1,0 +1,10 @@
+# macOS
+.DS_Store
+
+# temporary shader compile-test page (copied in during verification)
+.shader-test.html
+
+# editor state
+.vscode/
+.idea/
+*.swp
