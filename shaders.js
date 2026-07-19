@@ -12,7 +12,7 @@
 const SHARED = `
 precision highp float;
 
-const float NGLASS = 1.50;  // refractive index of the glass
+uniform float u_nGlass;     // refractive index: ~1.50 soda glass, ~1.56 crystal
 const float CANOPY = 2.6;   // height of the leaf canopy casting dapple
 
 // ---- the glass PROFILE: a surface of revolution ---------------------------
@@ -208,14 +208,17 @@ float rivulet(vec2 s){
 
 // Surface pattern height field on the wall. u_pat selects the cut:
 // 0 smooth, 1 diamond quilt, 2 vertical optic ribs, 3 spiral ribs,
-// 4 hobnail bead grid. All share the count/aspect sliders.
+// 4 hobnail bead grid, 5 pearl bands, 6 pinstripe grooves (the only
+// negative-relief cut). All share the count/aspect sliders.
 uniform float u_pat;
+uniform float u_patTop;        // where the pattern band ends: just below the
+                               // rim by default, the shoulder on the bottle
 float facetPattern(float th, float y){
   if(u_pat < 0.5) return 0.0;
   float m = u_diamN;             // repeats around the circumference
   // rows track the count so the aspect slider keeps its meaning
   float rows = (3.0 * u_diamN/16.0) / max(u_diam, 0.2);
-  float band = smoothstep(u_y0 + 0.06, u_y0 + 0.18, y) * (1.0 - smoothstep(u_H - 0.35, u_H - 0.18, y));
+  float band = smoothstep(u_y0 + 0.06, u_y0 + 0.18, y) * (1.0 - smoothstep(u_patTop - 0.17, u_patTop, y));
   if(u_pat < 1.5){
     // diamond quilt: two triangle waves in helical coordinates make a
     // lattice of little pyramids = the cut facets
@@ -233,15 +236,36 @@ float facetPattern(float th, float y){
     // spiral ribs: twisted optic, twist rate rides the aspect slider
     return pow(max(0.5 + 0.5*cos(th*m + y*rows*3.5), 0.0), 1.6) * band;
   }
-  // hobnail: hemispherical beads on a grid
-  vec2 g = vec2(fract(th*(m/6.2831853)), fract(y*rows)) - 0.5;
-  return sqrt(max(0.25 - dot(g,g)*2.4, 0.0)) * 1.9 * band;
+  if(u_pat < 4.5){
+    // hobnail: hemispherical beads on a grid
+    vec2 g = vec2(fract(th*(m/6.2831853)), fract(y*rows)) - 0.5;
+    return sqrt(max(0.25 - dot(g,g)*2.4, 0.0)) * 1.9 * band;
+  }
+  if(u_pat < 5.5){
+    // pearl bands: rings of large beads alternating with rings of half-size
+    // pearls nested a half-step around — fuller, rounder caps than hobnail,
+    // much finer than it: ~2.6x the repeats of the count slider
+    float mp = m*2.6;
+    float ry = y*rows*2.6;
+    float big = mod(floor(ry), 2.0);
+    vec2 g = vec2(fract(th*(mp/6.2831853) + (1.0 - big)*0.5), fract(ry)) - 0.5;
+    float R = mix(0.26, 0.46, big);
+    return sqrt(max(R*R - dot(g,g), 0.0))/0.46 * 2.2 * band;
+  }
+  // pinstripes: very thin vertical lines at 3x the count slider — unlike
+  // every other pattern these are carved INTO the wall (negative height),
+  // each groove a rounded channel, like fine engraved fluting
+  float gx = fract(th*(m*3.0/6.2831853)) - 0.5;
+  float q = clamp(1.0 - (gx/0.10)*(gx/0.10), 0.0, 1.0);
+  return -sqrt(q) * band;
 }
 float patAmp(){
   // cut depth per pattern: beads bulge more than cut facets
   if(u_pat < 1.5) return 0.010;
   if(u_pat < 3.5) return 0.014;
-  return 0.020;
+  if(u_pat < 4.5) return 0.020;
+  if(u_pat < 5.5) return 0.012;  // fine pearls sit shallower than hobnail
+  return 0.006;      // pinstripe grooves: shallow, so they never breach the wall
 }
 // manufacturing irregularity, shared by BOTH wall surfaces (a slumped glass
 // deforms as a whole): wobble wisps + past irr = 1 a gentle ovality. Keeping
@@ -250,7 +274,12 @@ float irrOffset(float th, float y){
   vec2 cw = vec2(cos(th), sin(th));
   float wob = (vnoise(cw*1.6 + vec2(3.0 + y*0.9, y*2.6)) - 0.5)
             + 0.5*(vnoise(cw*3.3 + vec2(9.2, y*5.3)) - 0.5);
-  return 0.0035*u_irr*wob + 0.010*max(u_irr - 1.0, 0.0)*sin(2.0*th + 1.7);
+  // stems and feet are the most precisely formed parts of real stemware —
+  // and on the near-flat foot a theta-only offset smears into radial spokes,
+  // while on a thin stem the absolute amplitude is a huge relative one —
+  // so below the bowl the irregularity fades to a remnant
+  float prec = u_y0 > 0.01 ? mix(0.15, 1.0, smoothstep(u_y0 - 0.05, u_y0 + 0.08, y)) : 1.0;
+  return (0.0035*u_irr*wob + 0.010*max(u_irr - 1.0, 0.0)*sin(2.0*th + 1.7)) * prec;
 }
 float outerRadius(float th, float y){
   // smaller/denser cuts are shallower, like real glassware
@@ -472,7 +501,7 @@ void main(){
     exp(-pow((lam - 0.50)/0.46, 2.0)),
     exp(-pow((lam - 0.82)/0.46, 2.0)));
   vec3 chCol = spec3 * (3.0 / (spec3.r + spec3.g + spec3.b));
-  float nGl = 1.500 + (lam - 0.5)*0.014*u_disp;  // red bends least, blue most
+  float nGl = u_nGlass + (lam - 0.5)*0.014*u_disp;  // red bends least, blue most
   float nCo = u_nLiq + (lam - 0.5)*0.006*u_disp;
 
   vec3 L = u_lightDir[li];
@@ -636,6 +665,16 @@ void main(){
   if(inLiq){
     // Beer-Lambert through the liquid: long chords die, short ones tint
     tint *= exp(-s * u_liqSig * 0.45) * 0.6;
+    // tint floor: a deep pour would arrive nearly black, so lift dying
+    // photons toward a short-chord sample of the drink's own hue — red
+    // wine throws a ruby caustic instead of a stain. Turbidity is applied
+    // after the floor so cloudy drinks still fade to glow by design.
+    float tl = dot(tint, vec3(0.2126, 0.7152, 0.0722));
+    if(tl < 0.075){
+      vec3 hueRef = exp(-0.35 * u_liqSig);
+      hueRef *= 0.075 / max(dot(hueRef, vec3(0.2126, 0.7152, 0.0722)), 1e-3);
+      tint = mix(hueRef, tint, tl/0.075);
+    }
     // out-scatter: turbid drinks steal energy from the transmitted beam
     tint *= exp(-s * u_turb * 3.0);
   }
@@ -1079,14 +1118,26 @@ void main(){
 
   float tTable = (rd.y < -0.001) ? -ro.y/rd.y : 1e5;
 
-  // the cola's open surface, seen directly through the rim from above
+  // capillary meniscus: rise at the wall and width of the climb
+  const float MEN_H = 0.010;
+  const float MEN_W = 0.014;
+
+  // the cola's open surface, seen directly through the rim from above.
+  // Surface tension: flat in the middle, climbing ~MEN_H up the wall over
+  // the last ~MEN_W (a capillary-rise exponential) — refine the flat-plane
+  // hit against that profile; two fixed-point steps are plenty at this scale
   float tLiq = 1e5;
   if(rd.y < -0.001){
     float tl = (u_liq - ro.y)/rd.y;
     if(tl > 0.0){
       vec3 ql = ro + rd*tl;
       float rL = innerR(atan(ql.z, ql.x), u_liq);
-      if(length(ql.xz) < rL) tLiq = tl;
+      for(int k=0;k<2;k++){
+        float hM = u_liq + MEN_H*exp((length(ql.xz) - rL)/MEN_W);
+        tl = (hM - ro.y)/rd.y;
+        ql = ro + rd*tl;
+      }
+      if(tl > 0.0 && length(ql.xz) < rL) tLiq = tl;
     }
   }
 
@@ -1128,7 +1179,7 @@ void main(){
     vec3 body;
     float th = atan(P.z, P.x);
     float glassLen = 0.0;                       // path length inside glass
-    vec3 d1 = refract(rd, N, 1.0/NGLASS);
+    vec3 d1 = refract(rd, N, 1.0/u_nGlass);
 
     vec3 radial = normalize(vec3(P.x, 0.0, P.z));
     bool innerHit = dot(N, radial) < -0.15 && P.y > u_cavY;
@@ -1141,7 +1192,7 @@ void main(){
       // its facets; the grazing Fresnel below silvers it toward the edges
       float fp = facetPattern(th, clamp(P.y, 0.0, u_H));
       glassLen = wallAt(th, clamp(P.y, 0.0, u_H))/0.7;
-      body = envColor(normalize(d1)) * vec3(0.93, 0.95, 0.93) * (0.72 + 0.30*fp);
+      body = envColor(normalize(d1)) * vec3(0.96, 0.97, 0.96) * (0.80 + 0.25*fp);
     } else if(P.y < u_cavY){
       // the thick solid base slab (or stem/foot): one long chord of glass
       float ro2 = profileR(P.y);
@@ -1150,7 +1201,17 @@ void main(){
       float c0 = dot(P.xz, P.xz) - ro2*ro2;
       float disc0 = max(b0*b0 - 4.0*a0*c0, 0.0);
       glassLen = (-b0 + sqrt(disc0)) / max(2.0*a0, 1e-4);
-      body = envColor(normalize(d1)) * (0.85 + 0.55*fbm(vec2(th*6.0, P.y*20.0)));
+      // blown-glass striations in the thick slab. The (th, y) form is right
+      // for a tumbler's vertical base sides but degenerates to radial spokes
+      // on the near-flat foot top and to harsh vertical stripes on a thin
+      // stem, so both sample world space instead — which across a slim stem
+      // is nearly constant, leaving it smooth like real drawn glass.
+      float horiz = smoothstep(0.4, 0.8, abs(N.y));
+      float stemF = u_y0 > 0.01 ? 1.0 - smoothstep(u_y0 - 0.02, u_y0 + 0.06, P.y) : 0.0;
+      float striae = mix(fbm(vec2(th*6.0, P.y*20.0)),
+                         fbm(P.xz*16.0 + 7.3),
+                         max(horiz, stemF));
+      body = envColor(normalize(d1)) * (0.85 + 0.55*striae);
       // amber wash where the slab carries light from the cola above it
       body = mix(body, u_liqGlow*0.95, 0.35*smoothstep(u_cavY - 0.05, u_cavY, P.y));
     } else {
@@ -1164,7 +1225,7 @@ void main(){
       if(P2.y < u_liq){
         // The liquid COLUMN sits inside the clear wall. Refract glass->cola
         // and filter the background by the true chord through the liquid.
-        vec3 d2 = refract(d1, Nin, NGLASS/u_nLiq);
+        vec3 d2 = refract(d1, Nin, u_nGlass/u_nLiq);
         if(dot(d2,d2) < 0.1){
           // TIR at the glass/cola interface: neutral clear-glass edge band
           body = envColor(reflect(d1, Nin)) * 0.45;
@@ -1240,7 +1301,7 @@ void main(){
         }
       } else {
         // empty part: cross the air gap and meet the BACK wall
-        vec3 d2 = refract(d1, Nin, NGLASS);
+        vec3 d2 = refract(d1, Nin, u_nGlass);
         if(dot(d2,d2) < 0.1){
           // total internal reflection in the front wall:
           // the dark mirror band hugging the silhouette edges
@@ -1380,7 +1441,13 @@ void main(){
     hitT = tLiq;
     vec3 Pl = ro + rd*tLiq;
     vec2 rip = vec2(fbm(Pl.xz*26.0 + u_time*0.5), fbm(Pl.xz*26.0 + 9.0 - u_time*0.4)) - 0.5;
-    vec3 Nl = normalize(vec3(rip.x*0.06, 1.0, rip.y*0.06));
+    // the meniscus tilts the normal toward the centre near the wall; the
+    // bright ring comes out of Fresnel + speculars on that tilt, not paint
+    float rP = length(Pl.xz);
+    float rL = innerR(atan(Pl.z, Pl.x), u_liq);
+    float menS = (MEN_H/MEN_W)*exp((rP - rL)/MEN_W);
+    vec2 rdir = rP > 1e-4 ? Pl.xz/rP : vec2(0.0);
+    vec3 Nl = normalize(vec3(rip.x*0.06 - menS*rdir.x, 1.0, rip.y*0.06 - menS*rdir.y));
     float frl = 0.02 + 0.98*pow(clamp(1.0 + dot(rd, Nl), 0.0, 1.0), 5.0);
     // transmission: refract into the liquid and look down at the sunlit base
     // through it — seen from above the cola is a lit amber column, only
@@ -1393,11 +1460,19 @@ void main(){
     // make its light shimmer
     vec3 sunIn = vec3(0.0);
     for(int i=0;i<NL;i++) sunIn += u_lightCol[i] * dapple(Pl, i);
-    vec3 bottom = (vec3(0.07, 0.065, 0.06) + 0.90*sunIn)
-                * (0.80 + 0.40*fbm(Pb.xz*9.0 + rip*3.0));
+    // near-clear spirits (gin, water) shouldn't read as a milky lit pool
+    // floor: smooth the mottle away and let the depth go darker and glassier,
+    // so the surface reflections and meniscus carry the look instead
+    float clr = smoothstep(0.55, 0.15, dot(u_liqSig, vec3(0.333)))
+              * exp(-4.0*u_turb);
+    vec3 bottom = (vec3(0.09, 0.085, 0.075) + 1.00*sunIn)
+                * (0.80 + 0.40*fbm(Pb.xz*9.0 + rip*3.0)*(1.0 - 0.6*clr))
+                * (1.0 - 0.32*clr);
     // Beer-Lambert alone carries the colour — no extra glow tint, which
-    // used to drag pale liquids green-dark when seen from above
-    vec3 deep = bottom * exp(-path * u_liqSig)
+    // used to drag pale liquids green-dark when seen from above. The 0.45
+    // sigma scale matches the photon tracer and the through-wall chords, so
+    // the drink reads the same colour from the top as from the side.
+    vec3 deep = bottom * exp(-path * u_liqSig * 0.45)
               + vec3(0.018, 0.011, 0.009);
     // turbid liquids: the depths are opaque — sunlit body colour instead
     float scS = 1.0 - exp(-path * u_turb * 7.0);
@@ -1417,12 +1492,9 @@ void main(){
       vec3 hr = reflect(u_lightDir[i], Nl);
       col += u_lightCol[i] * pow(max(dot(hr, -rd), 0.0), 300.0) * 2.0 * dapple(Pl, i);
     }
-    // bright meniscus ring where the surface climbs the inner wall
-    float rL = innerR(atan(Pl.z, Pl.x), u_liq);
-    col += vec3(0.55, 0.50, 0.42)*exp(-pow((rL - length(Pl.xz))/0.012, 2.0))*0.5;
     if(u_fizz > 0.01){
       // foam collar hugging the wall + drifting bubble rafts mid-surface
-      float edge = exp(-pow((rL - length(Pl.xz))/0.05, 2.0));
+      float edge = exp(-pow((rL - rP)/0.05, 2.0));
       float raft = smoothstep(0.62, 0.85, fbm(Pl.xz*14.0 + vec2(u_time*0.03, 0.0)));
       col += vec3(0.90, 0.87, 0.80) * (edge*0.8 + raft*0.35) * u_fizz
            * (0.3 + 0.7*dapple(Pl, 0));

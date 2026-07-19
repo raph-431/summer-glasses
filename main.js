@@ -104,17 +104,13 @@ const endDrag = () => { dragging = false; canvas.style.cursor = 'grab'; };
 addEventListener('pointerup', endDrag);
 addEventListener('pointercancel', endDrag);
 
-// G toggles the panel; H brings the haiku back; S saves the next frame as PNG
+// S saves the next frame as PNG. There is no reroll control: a viewer gets
+// exactly one deal per load. The #ui panel is never shown — it stays in the
+// DOM purely as the state store that frame() reads every frame.
 let wantShot = false;
 addEventListener('keydown', e => {
   if(e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-  if(e.key === 'g' || e.key === 'G'){
-    const ui = document.getElementById('ui');
-    ui.style.display = ui.style.display === 'none' ? '' : 'none';
-  }
-  if(e.key === 'h' || e.key === 'H') revealLegend();
   if(e.key === 's' || e.key === 'S') wantShot = true;
-  if(e.key === 'r' || e.key === 'R') randomize();
 });
 
 const $ = id => document.getElementById(id);
@@ -130,8 +126,8 @@ const SHAPES = {
               stemR:0, footR:0, footH:0, cavBase:0.06, wall:0.045, fillMax:0.90 },
   rocks:    { H:0.78, y0:0, knots:[0.300,0.305,0.310,0.315,0.320,0.325,0.330,0.335],
               stemR:0, footR:0, footH:0, cavBase:0.10, wall:0.055, fillMax:0.88 },
-  shot:     { H:0.52, y0:0, knots:[0.160,0.166,0.172,0.178,0.184,0.190,0.196,0.202],
-              stemR:0, footR:0, footH:0, cavBase:0.10, wall:0.050, fillMax:0.85 },
+  shot:     { H:0.42, y0:0, knots:[0.128,0.133,0.138,0.143,0.148,0.153,0.158,0.163],
+              stemR:0, footR:0, footH:0, cavBase:0.09, wall:0.050, fillMax:0.85 },
   barrel:   { H:1.00, y0:0, knots:[0.245,0.285,0.312,0.328,0.330,0.318,0.295,0.268],
               stemR:0, footR:0, footH:0, cavBase:0.07, wall:0.045, fillMax:0.88 },
   flared:   { H:1.10, y0:0, knots:[0.205,0.210,0.218,0.230,0.248,0.272,0.305,0.345],
@@ -144,6 +140,19 @@ const SHAPES = {
               stemR:0.028, footR:0.210, footH:0.020, cavBase:0.040, wall:0.022, fillMax:0.88 },
   goblet:   { H:1.15, y0:0.42, knots:[0.100,0.190,0.245,0.272,0.278,0.272,0.258,0.245],
               stemR:0.055, footR:0.250, footH:0.028, cavBase:0.050, wall:0.045, fillMax:0.85 },
+  // the odd ones out: a near-spherical bulb that closes to a small mouth
+  // (a genuine ball lens — its caustic is a blazing focal point), and a
+  // laboratory cone with a slim neck and a tiny lip flare
+  fishbowl: { H:1.24, y0:0, knots:[0.230,0.405,0.527,0.578,0.567,0.493,0.365,0.230],
+              stemR:0, footR:0, footH:0, cavBase:0.08, wall:0.050, fillMax:0.80 },
+  alembic:  { H:1.55, y0:0, knots:[0.475,0.406,0.338,0.269,0.200,0.131,0.110,0.120],
+              stemR:0, footR:0, footH:0, cavBase:0.07, wall:0.036, fillMax:0.85 },
+  // a full-size wine bottle: straight body, curved shoulder, slim neck with
+  // a small lip. The tall cavBase stands in for the punt. Nothing fits
+  // through that neck, hence noIce.
+  bottle:   { H:2.05, y0:0, knots:[0.300,0.302,0.304,0.305,0.230,0.105,0.082,0.086],
+              stemR:0, footR:0, footH:0, cavBase:0.12, wall:0.030, fillMax:0.78,
+              noIce:true, patTop:1.10 },
 };
 let shape = null;
 function applyShape(name){
@@ -259,17 +268,17 @@ const LIQUIDS = {
   sparkling: { hex:'#f0f3ea', turb:0.02, n:1.33, fizz:1.20, scat:'#f5f2df' },
   whiteWine: { hex:'#e8d68a', turb:0.03, n:1.36, fizz:0.00, scat:'#efe3a8' },
   redWine:   { hex:'#4a0e18', turb:0.10, n:1.36, fizz:0.00, scat:'#7a1f2c' },
-  rose:      { hex:'#e89aa0', turb:0.05, n:1.36, fizz:0.00, scat:'#f0b6ba' },
+  rose:      { hex:'#f2c2a4', turb:0.05, n:1.36, fizz:0.00, scat:'#f6d8c2' },
   whiskey:   { hex:'#b05e14', turb:0.02, n:1.36, fizz:0.00, scat:'#d08428' },
-  mojito:    { hex:'#c9e4b4', turb:0.35, n:1.34, fizz:0.55, scat:'#d8eec2' },
+  mojito:    { hex:'#e2e6a8', turb:0.18, n:1.34, fizz:0.55, scat:'#eef0c6' },
   blueLagoon:{ hex:'#1e6fd8', turb:0.08, n:1.34, fizz:0.60, scat:'#4a9ae8' },
   icedTea:   { hex:'#8a4514', turb:0.06, n:1.34, fizz:0.00, scat:'#b06a2a' },
   champagne: { hex:'#eedc9a', turb:0.03, n:1.34, fizz:1.35, scat:'#f5ecb4' },
-  spritz:    { hex:'#e0561e', turb:0.30, n:1.34, fizz:0.70, scat:'#f08a46' },
+  spritz:    { hex:'#e8781a', turb:0.30, n:1.34, fizz:0.70, scat:'#f5a44e' },
   pastis:    { hex:'#ece0a6', turb:0.85, n:1.34, fizz:0.00, scat:'#f4ecc0' },
   appleJuice:{ hex:'#d8a428', turb:0.30, n:1.34, fizz:0.00, scat:'#ecc45e' },
   shirleyTemple:{ hex:'#cc2440', turb:0.10, n:1.34, fizz:0.85, scat:'#e8637a' },
-  lemonade:  { hex:'#f0e8a0', turb:0.50, n:1.34, fizz:0.30, scat:'#f7f0bc' },
+  lemonade:  { hex:'#f6ecb4', turb:0.50, n:1.34, fizz:0.30, scat:'#faf4d0' },
   gin:       { hex:'#f2f6f4', turb:0.00, n:1.36, fizz:0.00, scat:'#ffffff' },
   ginFizz:   { hex:'#edeed6', turb:0.40, n:1.34, fizz:1.10, scat:'#f5f5e2' },
   empty:     { hex:'#f2f6f4', turb:0.00, n:1.33, fizz:0.00, scat:'#ffffff', empty:true },
@@ -292,78 +301,6 @@ function profR(y){
   const x = Math.min(Math.max((y - s.y0)/(s.H - s.y0), 0), 1)*7;
   const i = Math.min(Math.floor(x), 6), f = x - i;
   return s.prof[i]*(1-f) + s.prof[i+1]*f;
-}
-
-// ---------------------------------------------------------------------------
-// LEGEND — a generative haiku composed from the scene state: drink line (5),
-// setting line by canopy (7), time line by time-of-day preset (5). Shown on
-// load and on every deal, fading after seven seconds. Each bank's final
-// entry is the "aethereal" pick — more abstract than the rest of its bank.
-// ---------------------------------------------------------------------------
-const DRINK_LINE = {
-  soda:          ["cola bubbles rise", "dark soda, ice-cold", "the fizz settles down", "soda catches light", "a small universe"],
-  oj:            ["orange juice glows bright", "sunlight in a glass", "the orange juice gleams", "fresh juice, cold and bright", "a captured orange"],
-  water:         ["cold water, clear light", "water catches light", "clear water sits still", "ice water sits calm", "water holds no name"],
-  sparkling:     ["bubbles rise and pop", "sparkling water glows", "bright bubbles ascend", "water fizzes bright", "a thousand small breaths"],
-  whiteWine:     ["pale white wine, chilled now", "white wine catches light", "cold wine, crisp and pale", "the white wine glows pale", "a quiet gold fire"],
-  redWine:       ["red wine, deep and dark", "dark red wine glows deep", "the red wine runs deep", "bold red wine, held close", "the dark holds embers"],
-  rose:          ["pale rosé glows pink", "rosé catches light", "cold rosé, pale pink", "the rosé glows soft", "a blush, held in glass"],
-  whiskey:       ["amber whiskey glows", "whiskey catches light", "a dram, warm and deep", "whiskey, amber, still", "years, distilled to warmth"],
-  mojito:        ["mint and lime, ice clinks", "mojito fizzes", "mint leaves catch the light", "cold mint, ice, and rum", "mint, cool as a breath"],
-  blueLagoon:    ["blue lagoon glows bright", "electric blue glows", "the blue lagoon gleams", "ocean blue, ice-cold", "a sky turned to sea"],
-  icedTea:       ["amber iced tea glows", "cold tea, steeped and dark", "iced tea catches light", "cool tea, amber, deep", "slow hours, steeped and cold"],
-  champagne:     ["champagne bubbles rise", "cold champagne, pale gold", "champagne catches light", "bright bubbles, pale gold", "small stars, set alight"],
-  spritz:        ["bright spritz, bittersweet", "orange spritz glows bright", "the spritz, cold and bright", "spritz fizzes, pale gold", "bittersweet, and bright"],
-  pastis:        ["pastis, cloudy, cold", "pastis turns to milk", "cloudy pastis glows", "anise clouds the glass", "anise turns to mist"],
-  appleJuice:    ["apple juice runs sweet", "cold apple juice glows", "apple juice, sun-bright", "a harvest of light"],
-  shirleyTemple: ["cherry pink and sweet", "Shirley Temple glows", "grenadine runs sweet", "cherry-bright and sweet", "childhood, poured in pink"],
-  lemonade:      ["lemonade glows bright", "cold lemonade glows", "tart lemonade, cold", "sun-cooled lemonade", "citrus and sweetness"],
-  gin:           ["gin and juniper", "cold gin catches light", "gin glows, cold and bright", "neat gin, cold and clear", "juniper and cold"],
-  ginFizz:       ["gin fizz, cold and bright", "the gin fizz glows bright", "citrus gin fizz glows", "frothy gin fizz, cold", "foam, rising like cloud"],
-  empty:         ["the glass stands empty", "only ice remains", "the last drop is gone", "the glass sits, drained now", "the ghost of a drink"],
-};
-const SETTING_LINE = {
-  0: ["in the broadleaf's dappled shade", "on the terrasse, dappled shade", "beneath the leaf's mottled shade", "under the broad leaves' shadow",
-      "leaves cut the sunlight to coins", "cutting shapes in the raw wind"],
-  1: ["beneath the lace of thin leaves", "under the feathery shade", "in the fine dappled sunlight", "beneath acacia's thin shade",
-      "the small details of friendship", "lace and mesh, intertwined now"],
-  2: ["beneath the swaying palm trees", "under the tall palms, leaning", "poolside beneath the palm trees", "in the shade of palm fronds now",
-      "whisper of the fronds above", "waves of both light and darkness"],
-  3: ["under the pergola's shade", "beneath the pergola's shade", "on the vine-strung pergola", "in the pergola's cool shade",
-      "a lattice of ancient forms", "valleys of light and shadow"],
-  4: ["beneath the striped parasol", "under the parasol's shade", "at a table, sun-shaded", "beneath the parasol's stripes",
-      "a soft wall against the sun", "slow moving circle of shade"],
-};
-const TIME_LINE = {
-  dawn:            ["dawn breaks soft and gold", "morning mist still clings", "the air still holds night", "first light finds the glass", "threshold of the day"],
-  morning:         ["the sun climbs slowly", "morning mist still clings", "first light finds the glass", "threshold of the day"],
-  noon:            ["noon light, still and gold", "the sun stands still now", "shadows pull in tight", "heat shimmers the air", "midday heat presses", "the absence of shade"],
-  goldenAfternoon: ["gold light slants in low", "afternoon turns gold", "shadows stretch and lean", "the light softens now", "heat, honey, and heart"],
-  sunset:          ["the sun dips low now", "the last light fades out", "colors bleed to rose", "the sky catches fire", "day exhales and falls", "exhale of the day"],
-  dusk:            ["blue dusk wraps the air", "twilight settles slow", "the color drains out", "shadows turn to blue", "in the deep blue hour"],
-  night:           ["evening settles in", "the stars start to show", "night wraps the table", "lanterns start to glow", "the dark holds it close", "from light years away"],
-};
-const pickCap = arr => arr[(Math.random()*arr.length)|0];
-let legendTimer = 0;
-function showLegend(){
-  const el  = $('legend');
-  const liq = $('liquid').value;
-  el.textContent = [
-    pickCap(DRINK_LINE[liq] || DRINK_LINE.water),
-    pickCap(SETTING_LINE[$('canopy').value] || SETTING_LINE[0]),
-    pickCap(TIME_LINE[$('tod').value] || TIME_LINE.goldenAfternoon),
-  ].join('\n');
-  el.classList.add('show');
-  clearTimeout(legendTimer);
-  legendTimer = setTimeout(() => el.classList.remove('show'), 7000);
-}
-// H replays the deal's haiku without recomposing it (unless there is none yet)
-function revealLegend(){
-  const el = $('legend');
-  if(!el.textContent){ showLegend(); return; }
-  el.classList.add('show');
-  clearTimeout(legendTimer);
-  legendTimer = setTimeout(() => el.classList.remove('show'), 7000);
 }
 
 // ---------------------------------------------------------------------------
@@ -394,11 +331,16 @@ const SHAPE_LIQUIDS = {
   martini:  ['blueLagoon','rose','whiteWine','empty','gin'],
   flute:    ['sparkling','rose','whiteWine','champagne'],
   goblet:   ['redWine','mojito','blueLagoon','soda','water','spritz','appleJuice'],
+  fishbowl: ['mojito','blueLagoon','water','soda','lemonade','shirleyTemple','ginFizz'],
+  alembic:  ['water','pastis','blueLagoon','icedTea','lemonade','empty'],
+  bottle:   ['redWine','whiteWine','rose','water'],
 };
 const SHAPE_PATTERNS = {
-  highball: ['1','2','3','0','4'], rocks: ['1','0','2','4'], shot: ['3','2','0','1'],
-  barrel: ['0','2','4','1'], flared: ['0','2','1'], wine: ['0','2','3'],
-  martini: ['0','2','1'], flute: ['0','2','3'], goblet: ['1','4','2','3'],
+  highball: ['1','2','3','0','4','5','6'], rocks: ['1','0','2','4','5','6'], shot: ['3','2','0','1'],
+  barrel: ['0','2','4','1','5','6'], flared: ['0','2','1','6'], wine: ['0','2','3','6'],
+  martini: ['0','2','1','6'], flute: ['0','2','3','6'], goblet: ['1','4','2','3','5','6'],
+  fishbowl: ['0','2','5','1'], alembic: ['0','2','3','6'],
+  bottle: ['0','1','2','3','4','5','6'],
 };
 const GLASS_TINTS = ['#eefbf1','#eefbf1','#eefbf1','#e8f2fa','#f8ece8','#eaf6e2',
                      '#d8ecf6','#f6e6d8','#e6dcf2','#d2e9e4','#f2dede','#dfe8c9'];
@@ -409,21 +351,59 @@ const RIM_ODDS = { wine:0.35, martini:0.35, flute:0.40, goblet:0.30 };
 const COLD_LIQS = ['soda','water','icedTea','mojito','blueLagoon','oj','sparkling','whiskey',
                    'gin','lemonade','shirleyTemple','ginFizz'];
 
-let seed = (Math.random()*2**31)|0;
-let spillSeed = Math.random();      // puddle outline: fresh on every load too
-let canRot = Math.random()*6.2832;  // palm/pergola orientation: ditto
-let tabRot = Math.random()*6.2832;  // wood plank direction: ditto
+// ---------------------------------------------------------------------------
+// TOKEN HASH — the single entropy source of a deal. Priority: an injected
+// window.TOKEN_HASH (set by the minted token's bootstrap) → #seed=<hex> in
+// the URL (reproduce a specific deal) → fresh randomness (dev). Everything
+// that defines the piece's identity flows from this one string through
+// randomize(); per-frame photon sampling and the audio stay Math.random() —
+// they are temporal dither and ambience, not identity.
+// ---------------------------------------------------------------------------
+const TOKEN_MODE = typeof window.TOKEN_HASH === 'string';
+const tokenHash = (() => {
+  if(TOKEN_MODE) return window.TOKEN_HASH.toLowerCase();
+  const m = location.hash.match(/seed=([0-9a-fx]+)/i);
+  if(m) return m[1].toLowerCase();
+  let h = '0x';
+  for(let i = 0; i < 64; i++) h += '0123456789abcdef'[(Math.random()*16)|0];
+  return h;
+})();
+console.log('deal seed: ' + tokenHash + ' — reproduce with index.html#seed=' + tokenHash.slice(2));
+
+// xmur3 string hash: folds the token hash into the 32-bit seed mulberry32
+// wants. Any hex string works — length and content both change the outcome.
+function xmur3(str){
+  let h = 1779033703 ^ str.length;
+  for(let i = 0; i < str.length; i++){
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = h << 13 | h >>> 19;
+  }
+  return () => {
+    h = Math.imul(h ^ h >>> 16, 2246822507);
+    h = Math.imul(h ^ h >>> 13, 3266489909);
+    return (h ^= h >>> 16) >>> 0;
+  };
+}
+let seed = xmur3(tokenHash)()|0;
+let glassN = 1.51;      // refractive index; crystal deals raise it
+let isCrystal = false;  // labels the info panel
+let spillSeed = 0;      // puddle outline        — rolled per deal in randomize()
+let canRot = 0;         // palm/pergola bearing  — ditto
+let tabRot = 0;         // wood plank direction  — ditto
 function randomize(){
   const r = mulberry32(seed = (seed*1664525 + 1013904223)|0);
   const set = (id, v) => { $(id).value = v; };
 
   const shapeName = pick(r, Object.keys(SHAPES));
   $('shape').value = shapeName; applyShape(shapeName);
-  // jitter the knots ±5%, delta-clamped so the raymarcher stays stable
+  // jitter the knots ±5%, delta-clamped so the raymarcher stays stable.
+  // The clamp is relative to each shape's own base deltas (an absolute cap
+  // would flatten deliberately steep profiles like the fishbowl's bulb)
   shape.prof = shape.prof.map(k => k*(0.95 + 0.10*r()));
   for(let i=1;i<8;i++){
+    const d0 = SHAPES[shapeName].knots[i] - SHAPES[shapeName].knots[i-1];
     const d = shape.prof[i] - shape.prof[i-1];
-    shape.prof[i] = shape.prof[i-1] + Math.max(-0.06, Math.min(0.06, d));
+    shape.prof[i] = shape.prof[i-1] + Math.min(Math.max(d, d0 - 0.05), d0 + 0.05);
   }
   set('wall', (shape.wall*rng(r, 0.75, 1.35)).toFixed(3));
   set('irr', (r() < 0.25 ? rng(r, 1.0, 1.45) : rng(r, 0.2, 0.9)).toFixed(2));
@@ -439,6 +419,19 @@ function randomize(){
   set('diamN', Math.round(rng(r, 8, 30)));
   set('disp', rng(r, 0.1, 1.4).toFixed(2));
 
+  // crystal: harder refraction, real fire, water-clear body, deep cuts —
+  // likelier for stemware, like a good cabinet
+  const crystal = r() < (shape.y0 > 0 ? 0.22 : 0.10);
+  isCrystal = crystal;
+  glassN = crystal ? rng(r, 1.55, 1.58) : rng(r, 1.50, 1.52);
+  if(crystal){
+    set('glassCol', pick(r, ['#f6fbfa', '#f7f7fc', '#f4faf7']));
+    set('disp', rng(r, 1.2, 1.9).toFixed(2));
+    set('facet', rng(r, 1.1, 1.9).toFixed(2));
+    const cuts = SHAPE_PATTERNS[shapeName].filter(p => p === '1' || p === '4');
+    if(cuts.length && r() < 0.75) set('pat', pick(r, cuts));
+  }
+
   const liqName = pick(r, SHAPE_LIQUIDS[shapeName]);
   $('liquid').value = liqName;
   liquid = LIQUIDS[liqName];
@@ -449,7 +442,7 @@ function randomize(){
   set('liq', fillV.toFixed(2));
 
   // ice belongs in tumblers holding a cold drink, with at least a half pour
-  const iceOK = shape.y0 === 0 && !liquid.empty && fillV >= 0.5
+  const iceOK = shape.y0 === 0 && !shape.noIce && !liquid.empty && fillV >= 0.5
              && COLD_LIQS.includes(liqName);
   $('ice').value = iceOK ? pick(r, ['0','1','1','2','2','3']) : '0';
 
@@ -471,12 +464,39 @@ function randomize(){
   spillSeed = r();
   canRot = r()*6.2832;
   tabRot = r()*6.2832;
-  showLegend();
+  // machine-readable deal summary for marketplaces/indexers (same wording
+  // as the info panel)
+  window.$features = {
+    drink:     selText('liquid'),
+    glassware: (isCrystal ? 'crystal ' : '') + selText('shape'),
+    pattern:   selText('pat'),
+    timeOfDay: selText('tod'),
+    canopy:    selText('canopy'),
+    table:     selText('table'),
+    ice:       +$('ice').value,
+  };
+  window.onDeal?.();   // optional hook — haiku.js captions the deal if loaded
+  if(infoPanel.style.display === 'block') fillInfo();
 }
-$('rand').addEventListener('click', randomize);
-showLegend();   // caption the opening scene too
-// dev hook: load index.html#randtest to hammer the randomizer for errors
-if(location.hash === '#randtest'){ for(let i=0;i<60;i++) randomize(); }
+
+// ---- info panel: what's on the table right now ----------------------------
+const infoPanel = $('infoPanel');
+const selText = id => { const s = $(id); return s.options[s.selectedIndex].text; };
+function fillInfo(){
+  infoPanel.innerHTML =
+    `<div><span>drink</span>${selText('liquid')}</div>` +
+    `<div><span>glassware</span>${isCrystal ? 'crystal ' : ''}${selText('shape')}</div>` +
+    `<div><span>pattern</span>${selText('pat')}</div>` +
+    `<div><span>time of day</span>${selText('tod')}</div>`;
+}
+$('infoBtn').addEventListener('click', () => {
+  const open = infoPanel.style.display === 'block';
+  if(!open) fillInfo();
+  infoPanel.style.display = open ? 'none' : 'block';
+});
+// dev hook: load index.html#randtest to hammer the randomizer for errors.
+// Inert in token mode — a minted token shows exactly its one deal.
+if(!TOKEN_MODE && location.hash === '#randtest'){ for(let i=0;i<60;i++) randomize(); }
 
 // dev hooks: #fps shows a frame-rate meter; #perftest also loads the
 // heaviest combination we ship (ice + fizz + night bulbs + hobnail + tiles)
@@ -751,7 +771,7 @@ function frame(){
   const colaGlow = [1,
     Math.pow(Math.max(colaLin[1]/colaLin[0], 1e-3), 0.33),
     Math.pow(Math.max(colaLin[2]/colaLin[0], 1e-3), 0.33) * 0.55];
-  const glassSig = sigFrom($('glassCol').value, 0.30);
+  const glassSig = sigFrom($('glassCol').value, 0.42);
   const setShared = (u) => {
     gl.uniform1fv(u.u_prof, shape.prof);
     gl.uniform1f(u.u_H, shape.H);
@@ -768,11 +788,13 @@ function frame(){
     gl.uniform1f(u.u_diam, diam);
     gl.uniform1f(u.u_diamN, parseFloat($('diamN').value));
     gl.uniform1f(u.u_pat, parseFloat($('pat').value));
+    gl.uniform1f(u.u_patTop, shape.patTop ?? shape.H - 0.18);
     gl.uniform1f(u.u_cond, cond);
     gl.uniform1f(u.u_irr, parseFloat($('irr').value));
     gl.uniform3f(u.u_liqSig, ...colaSig);
     gl.uniform3f(u.u_liqGlow, ...colaGlow);
     gl.uniform3f(u.u_glassSig, ...glassSig);
+    gl.uniform1f(u.u_nGlass, glassN);
     gl.uniform1f(u.u_turb, parseFloat($('turb').value));
     gl.uniform1f(u.u_fizz, liquid.empty ? 0 : parseFloat($('fizz').value));
     gl.uniform1f(u.u_nLiq, liquid.n);
@@ -871,23 +893,37 @@ function frame(){
   gl.uniform1f(uP.u_soft, T.soft*(1.0 + 0.8*wind));
   // per-frame energy: steady state ≈ gain/(1-decay); smaller splats since
   // accumulation fills the gaps, so the folds stay filament-sharp.
-  // Two exposure corrections keep the caustic visible in every deal:
+  // Three exposure corrections keep the caustic visible in every deal:
   // (a) a larger low-sun window spreads photons over more texels — undo it;
   // (b) dark/turbid liquids and mist absorb photons — compensate by the
-  //     expected average loss, capped so deep drinks stay plausible.
+  //     expected average loss, capped so deep drinks stay plausible;
+  // (c) contrast tracks the lit table: a caustic is additive light, so a
+  //     bright scene (noon, pale stone, thin shade) swallows a fixed-energy
+  //     splat while a dim one exaggerates it — scale gain by expected table
+  //     luminance, anchored at 1x for the golden-afternoon stone default.
   const windowComp = (caustS/1.7)*(caustS/1.7);
   const turbv = parseFloat($('turb').value);
   const rInTyp = Math.max(profR((cavY + liq)*0.5) - wallv, 0.05);
   const sTyp = 1.4*rInTyp;                    // typical chord through the drink
   const lumOf = c => 0.2126*c[0] + 0.7152*c[1] + 0.0722*c[2];
-  const tintTyp = lumOf(colaSig.map(sg => Math.exp(-sTyp*sg*0.45)))*0.6
+  // 0.075 floor mirrors the photon shader's hue-preserving tint floor
+  const tintTyp = Math.max(lumOf(colaSig.map(sg => Math.exp(-sTyp*sg*0.45)))*0.6, 0.075)
                 * Math.exp(-sTyp*turbv*3.0);
   const cover = liquid.empty ? 0
               : Math.min(Math.max((liq - cavY)/(0.99*shape.H - 0.02), 0), 1);
   const mistLoss = 1 - 0.10*Math.min(cond, 1.2);
   const expFac = (1 - cover + cover*tintTyp) * mistLoss;
   const boost = Math.min(Math.max(1/Math.max(expFac, 0.05), 1.0), 5.0);
-  gl.uniform1f(uP.u_gain, 0.09 * windowComp * boost);
+  // expected table luminance: leaf-mixed ambient + the preset lights through
+  // the mean dapple gap (0.71 = mean occlusion breathing), times the table's
+  // albedo luminance. 0.65 is this estimate for the default anchor deal.
+  const TAB_ALB = { 0:0.83, 1:0.49, 2:0.80, 3:0.72, 4:0.73 };
+  const ambMix = T.ambS.map((v,i) => v + (T.ambL[i] - v)*0.55*leaf);
+  const dirLum = T.spec.reduce((a,s) => a + lumOf(s.col)*s.int, 0)*0.71;
+  const Ltab = (lumOf(ambMix) + dirLum*(1 - 0.62*leaf)*1.10)
+             * (TAB_ALB[$('table').value] ?? 0.8);
+  const brightComp = Math.min(Math.max(Ltab/0.65, 0.85), 2.2);
+  gl.uniform1f(uP.u_gain, 0.09 * windowComp * Math.min(boost*brightComp, 6.0));
   gl.uniform1f(uP.u_seed, Math.random()*100.0);
   gl.uniform1f(uP.u_disp, parseFloat($('disp').value));
   gl.uniform1f(uP.u_mode, 0);            // transmitted photons
@@ -1006,4 +1042,7 @@ function frame(){
 
   requestAnimationFrame(frame);
 }
+// the opening deal: every load is a hash-determined glass (perftest pins its
+// own worst-case setup instead)
+if(!location.hash.includes('perftest')) randomize();
 frame();

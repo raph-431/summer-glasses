@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check shaders.js)",
+      "Bash(node --check main.js)",
+      "Bash(python3 -)",
+      "Skill(claude-in-chrome)",
+      "Bash(python3 -m http.server 8741 --bind 127.0.0.1)",
+      "Bash([ -x \"$CHROME\" ])",
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless=new --enable-logging=stderr --v=0 --no-first-run --user-data-dir=/private/tmp/claude-501/-Users-raphael-Projects-summer-glasses/bf192b43-d5d4-4985-90ff-5171a7e861a5/scratchpad/chrome-profile --virtual-time-budget=6000 --dump-dom http://127.0.0.1:8741/index.html)",
+      "Bash(cp \"/private/tmp/claude-501/-Users-raphael-Projects-summer-glasses/bf192b43-d5d4-4985-90ff-5171a7e861a5/scratchpad/shader-test.html\" .shader-test.html)",
+      "Bash(timeout 60 \"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless=new --enable-logging=stderr --v=0 --no-first-run --user-data-dir=\"/private/tmp/claude-501/-Users-raphael-Projects-summer-glasses/bf192b43-d5d4-4985-90ff-5171a7e861a5/scratchpad/chrome-profile\" --virtual-time-budget=4000 --dump-dom \"http://127.0.0.1:8741/.shader-test.html\")",
+      "Bash(pkill -f \"http.server 8741\")",
+      "Bash(pkill -f \"virtual-time-budget\")",
+      "Bash(node --check \"/Users/raphael/Projects/summer glasses/main.js\")",
+      "Bash(pkill -f \"headless=new\")",
+      "Bash('sun')",
+      "Bash(grep -n \"u_sun\\\\b\\\\|const sun\\\\|sunV\\\\|'sun'\\\\|\\(\\\\\"sun\\\\\"\\)\\\\|\\\\\\\\$\\('sun'\\)\\\\|u_ambS\\\\|u_ambL\\\\|ambS\\\\|ambL\" \"/Users/raphael/Projects/summer glasses/main.js\")"
+    ]
+  }
+}

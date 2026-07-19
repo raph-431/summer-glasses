@@ -1,8 +1,9 @@
 # macOS
 .DS_Store
 
-# temporary shader compile-test page (copied in during verification)
+# temporary test pages (generated during verification)
 .shader-test.html
+.det-test.html
 
 # editor state
 .vscode/

@@ -26,6 +26,11 @@
     font:11px inherit; color:#3a3733; background:rgba(255,255,255,.7);
     border:1px solid rgba(120,90,50,.3); border-radius:6px; padding:2px 4px;
   }
+  #rand {
+    margin:2px 4px 4px 0; padding:4px 10px; font:12px inherit; cursor:pointer;
+    border:1px solid rgba(120,90,50,.35); border-radius:8px;
+    background:rgba(255,255,255,.6); color:#3a3733;
+  }
   #audioBtn, #infoBtn {
     position:fixed; right:26px; bottom:22px; z-index:2;
     padding:0; border:none; background:none; cursor:pointer;
@@ -73,7 +78,8 @@
 <div id="infoPanel"></div>
 <div id="ui" style="display:none">
   <h1>Simulated caustics — summer glasses</h1>
-  <div class="hint">photons traced through the glass each frame<br>drag to orbit · H shows the haiku · S saves a PNG</div>
+  <div class="hint">photons traced through the glass each frame<br>drag to orbit — ✦ deals a new glass<br>G toggles this panel · H shows the haiku · S saves a PNG · R randomizes</div>
+  <button id="rand">✦ randomize</button>
   <div class="grp"><h2>glass</h2>
     <label><span>glass shape</span><select id="shape">
       <option value="highball" selected>highball</option>
@@ -148,7 +154,7 @@
   </div>
   <div class="grp"><h2>scene</h2>
     <label><span>time of day</span><select id="tod">
-      <option value="goldenAfternoon" selected>afternoon</option>
+      <option value="goldenAfternoon" selected>golden afternoon</option>
       <option value="dawn">dawn</option>
       <option value="morning">morning</option>
       <option value="noon">noon</option>
@@ -178,6 +184,5 @@
 
 <script src="shaders.js"></script>
 <script src="main.js"></script>
-<script src="haiku.js"></script> <!-- dev-only caption layer; excluded from the minted build -->
 </body>
 </html>
