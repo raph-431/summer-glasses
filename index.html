@@ -48,10 +48,9 @@
   }
   #err { position:fixed; inset:0; display:none; place-items:center; color:#333; font:14px sans-serif; }
   #legend {
-    display:none; /* legend parked for now — delete this line to bring it back */
     position:fixed; left:50%; bottom:8%; transform:translateX(-50%);
-    z-index:2; max-width:72vw; text-align:center;
-    font:italic 17px/1.5 Georgia, "Times New Roman", serif;
+    z-index:2; max-width:72vw; text-align:center; white-space:pre-line;
+    font:italic 17px/1.7 Georgia, "Times New Roman", serif;
     color:rgba(255,255,255,.93);
     text-shadow:0 1px 10px rgba(20,15,10,.55), 0 0 2px rgba(20,15,10,.35);
     opacity:0; transition:opacity 1.8s ease; pointer-events:none; user-select:none;
@@ -66,7 +65,7 @@
 <button id="audioBtn">sound on/off</button>
 <div id="ui" style="display:none">
   <h1>Simulated caustics — summer glasses</h1>
-  <div class="hint">photons traced through the glass each frame<br>drag to orbit — ✦ deals a new glass<br>H toggles this panel · S saves a PNG · R randomizes</div>
+  <div class="hint">photons traced through the glass each frame<br>drag to orbit — ✦ deals a new glass<br>G toggles this panel · H shows the haiku · S saves a PNG · R randomizes</div>
   <button id="rand">✦ randomize</button>
   <div class="grp"><h2>glass</h2>
     <label><span>glass shape</span><select id="shape">

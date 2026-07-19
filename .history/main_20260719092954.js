@@ -7,7 +7,7 @@ const gl = canvas.getContext('webgl2', { antialias:false, alpha:false });
 if(!gl || !gl.getExtension('EXT_color_buffer_float')){
   document.getElementById('err').style.display = 'grid';
   throw new Error('webgl2/float unavailable');
-}
+}4
 
 // ---------------------------------------------------------------------------
 // GL plumbing
@@ -104,15 +104,14 @@ const endDrag = () => { dragging = false; canvas.style.cursor = 'grab'; };
 addEventListener('pointerup', endDrag);
 addEventListener('pointercancel', endDrag);
 
-// G toggles the panel; H brings the haiku back; S saves the next frame as PNG
+// H hides the panel for clean shots; S saves the next rendered frame as PNG
 let wantShot = false;
 addEventListener('keydown', e => {
   if(e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-  if(e.key === 'g' || e.key === 'G'){
+  if(e.key === 'h' || e.key === 'H'){
     const ui = document.getElementById('ui');
     ui.style.display = ui.style.display === 'none' ? '' : 'none';
   }
-  if(e.key === 'h' || e.key === 'H') revealLegend();
   if(e.key === 's' || e.key === 'S') wantShot = true;
   if(e.key === 'r' || e.key === 'R') randomize();
 });
@@ -295,72 +294,62 @@ function profR(y){
 }
 
 // ---------------------------------------------------------------------------
-// LEGEND — a generative haiku composed from the scene state: drink line (5),
-// setting line by canopy (7), time line by time-of-day preset (5). Shown on
-// load and on every deal, fading after seven seconds. Each bank's final
-// entry is the "aethereal" pick — more abstract than the rest of its bank.
+// LEGEND — a one-line caption composed from the scene state (drink, canopy,
+// time of day), shown on load and on every deal, fading after ten seconds.
 // ---------------------------------------------------------------------------
-const DRINK_LINE = {
-  soda:          ["cola bubbles rise", "dark soda, ice-cold", "the fizz settles down", "soda catches light", "a small universe"],
-  oj:            ["orange juice glows bright", "sunlight in a glass", "the orange juice gleams", "fresh juice, cold and bright", "a captured orange"],
-  water:         ["cold water, clear light", "water catches light", "clear water sits still", "ice water sits calm", "water holds no name"],
-  sparkling:     ["bubbles rise and pop", "sparkling water glows", "bright bubbles ascend", "water fizzes bright", "a thousand small breaths"],
-  whiteWine:     ["pale white wine, chilled now", "white wine catches light", "cold wine, crisp and pale", "the white wine glows pale", "a quiet gold fire"],
-  redWine:       ["red wine, deep and dark", "dark red wine glows deep", "the red wine runs deep", "bold red wine, held close", "the dark holds embers"],
-  rose:          ["pale rosé glows pink", "rosé catches light", "cold rosé, pale pink", "the rosé glows soft", "a blush, held in glass"],
-  whiskey:       ["amber whiskey glows", "whiskey catches light", "a dram, warm and deep", "whiskey, amber, still", "years, distilled to warmth"],
-  mojito:        ["mint and lime, ice clinks", "mojito fizzes", "mint leaves catch the light", "cold mint, ice, and rum", "mint, cool as a breath"],
-  blueLagoon:    ["blue lagoon glows bright", "electric blue glows", "the blue lagoon gleams", "ocean blue, ice-cold", "a sky turned to sea"],
-  icedTea:       ["amber iced tea glows", "cold tea, steeped and dark", "iced tea catches light", "cool tea, amber, deep", "slow hours, steeped and cold"],
-  champagne:     ["champagne bubbles rise", "cold champagne, pale gold", "champagne catches light", "bright bubbles, pale gold", "small stars, set alight"],
-  spritz:        ["bright spritz, bittersweet", "orange spritz glows bright", "the spritz, cold and bright", "spritz fizzes, pale gold", "bittersweet, and bright"],
-  pastis:        ["pastis, cloudy, cold", "pastis turns to milk", "cloudy pastis glows", "anise clouds the glass", "anise turns to mist"],
-  appleJuice:    ["apple juice runs sweet", "cold apple juice glows", "apple juice, sun-bright", "a harvest of light"],
-  shirleyTemple: ["cherry pink and sweet", "Shirley Temple glows", "grenadine runs sweet", "cherry-bright and sweet", "childhood, poured in pink"],
-  lemonade:      ["lemonade glows bright", "cold lemonade glows", "tart lemonade, cold", "sun-cooled lemonade", "citrus and sweetness"],
-  gin:           ["gin and juniper", "cold gin catches light", "gin glows, cold and bright", "neat gin, cold and clear", "juniper and cold"],
-  ginFizz:       ["gin fizz, cold and bright", "the gin fizz glows bright", "citrus gin fizz glows", "frothy gin fizz, cold", "foam, rising like cloud"],
-  empty:         ["the glass stands empty", "only ice remains", "the last drop is gone", "the glass sits, drained now", "the ghost of a drink"],
+const TIME_PHRASES = {
+  dawn:            ["at dawn", "at first light", "at sunrise", "in the pale morning haze"],
+  morning:         ["in the cool of early morning", "in the fresh morning light", "before the heat sets in"],
+  noon:            ["at high noon", "under the midday sun", "in the heat of noon", "in broad daylight"],
+  goldenAfternoon: ["during the golden hour", "in the late afternoon", "in the slanting afternoon light", "in the honeyed afternoon light"],
+  sunset:          ["at sunset", "as the sun sets", "in the last light of day", "as the light fades"],
+  dusk:            ["during the blue hour", "at twilight", "in the violet dusk", "at dusk's first hour", "in the gathering dark"],
+  night:           ["at nightfall", "under the stars", "in the warm night air", "at midnight", "in the glow of string lights"],
 };
-const SETTING_LINE = {
-  0: ["in the broadleaf's dappled shade", "on the terrasse, dappled shade", "beneath the leaf's mottled shade", "under the broad leaves' shadow",
-      "leaves cut the sunlight to coins", "cutting shapes in the raw wind"],
-  1: ["beneath the lace of thin leaves", "under the feathery shade", "in the fine dappled sunlight", "beneath acacia's thin shade",
-      "the small details of friendship", "lace and mesh, intertwined now"],
-  2: ["beneath the swaying palm trees", "under the tall palms, leaning", "poolside beneath the palm trees", "in the shade of palm fronds now",
-      "whisper of the fronds above", "waves of both light and darkness"],
-  3: ["under the pergola's shade", "beneath the pergola's shade", "on the vine-strung pergola", "in the pergola's cool shade",
-      "a lattice of ancient forms", "valleys of light and shadow"],
-  4: ["beneath the striped parasol", "under the parasol's shade", "at a table, sun-shaded", "beneath the parasol's stripes",
-      "a soft wall against the sun", "slow moving circle of shade"],
+const LOC_PHRASES = {
+  0: ["on the terrasse, in dappled shade", "beneath the broad-leafed canopy", "in the tree's mottled shade", "under the leafy awning"],
+  1: ["beneath the lace of leaves", "in the fine dappled light", "under the feathery canopy", "beneath the acacia's thin shade"],
+  2: ["beneath the palms", "in the shade of the palm fronds", "under swaying palms", "poolside beneath the palms"],
+  3: ["under the pergola", "on the terrasse, beneath the pergola", "in the pergola's striped shade", "on the vine-covered terrace"],
+  4: ["beneath the parasol", "under the umbrella's shade", "at a shaded table", "beneath the striped parasol"],
 };
-const TIME_LINE = {
-  dawn:            ["dawn breaks soft and gold", "morning mist still clings", "the air still holds night", "first light finds the glass", "threshold of the day"],
-  morning:         ["the sun climbs slowly", "morning mist still clings", "first light finds the glass", "threshold of the day"],
-  noon:            ["noon light, still and gold", "the sun stands still now", "shadows pull in tight", "heat shimmers the air", "midday heat presses", "the absence of shade"],
-  goldenAfternoon: ["gold light slants in low", "afternoon turns gold", "shadows stretch and lean", "the light softens now", "heat, honey, and heart"],
-  sunset:          ["the sun dips low now", "the last light fades out", "colors bleed to rose", "the sky catches fire", "day exhales and falls", "exhale of the day"],
-  dusk:            ["blue dusk wraps the air", "twilight settles slow", "the color drains out", "shadows turn to blue", "in the deep blue hour"],
-  night:           ["evening settles in", "the stars start to show", "night wraps the table", "lanterns start to glow", "the dark holds it close", "from light years away"],
+// each drink: noun-phrases that slot into "Enjoy ___ {location}, {time}."
+// "empty" is special-cased below (different verb, no "Enjoy"). Avoid trailing
+// appositive commas — the template appends the next clause with just a space.
+const DRINK_PHRASES = {
+  soda:          ["this soda", "this ice-cold soda", "the fizzing soda", "a glass of soda", "this dark, bubbling soda", "a cold pour of soda"],
+  oj:            ["this orange juice", "a glass of fresh orange juice", "the sun-bright orange juice", "this cold-pressed orange juice", "a tall glass of orange juice"],
+  water:         ["this water", "a glass of cold water", "this ice water", "the clear water", "a cool glass of water"],
+  sparkling:     ["this sparkling water", "the fizzing water", "this glass of bubbles", "the chilled sparkling water", "this bright, bubbling water"],
+  whiteWine:     ["this white wine", "a chilled glass of white wine", "the pale white wine", "this crisp white wine", "a cold glass of white wine"],
+  redWine:       ["this red wine", "a glass of red wine", "the deep red wine", "this bold red wine", "a dark glass of red wine"],
+  rose:          ["this rosé", "a chilled glass of rosé", "the pale pink wine", "this summer rosé", "a cold glass of rosé"],
+  whiskey:       ["this whiskey", "a glass of whiskey", "the amber whiskey", "this neat pour of whiskey", "a dram of whiskey"],
+  mojito:        ["this mojito", "the minted mojito", "a cold mojito", "this mint-fizzed mojito", "a glass of mojito with clinking ice"],
+  blueLagoon:    ["this blue lagoon", "the electric-blue lagoon", "a glass of blue lagoon", "this ocean-blue cocktail", "the vivid blue lagoon"],
+  icedTea:       ["this iced tea", "a tall glass of iced tea", "the amber iced tea", "this cold-brewed tea", "a cool glass of iced tea"],
+  champagne:     ["this champagne", "a glass of champagne", "the chilled champagne", "this glass of bubbly", "a flute of champagne"],
+  spritz:        ["this spritz", "the bittersweet spritz", "a glass of spritz", "this bright orange spritz", "a cold spritz"],
+  pastis:        ["this pastis", "a glass of pastis", "the cloudy pastis", "this anise-clouded pastis", "a louche glass of pastis"],
+  appleJuice:    ["this apple juice", "a glass of apple juice", "the crisp apple juice", "this cold-pressed apple juice", "a tall glass of apple juice"],
+  shirleyTemple: ["this Shirley Temple", "a glass of Shirley Temple", "the pink Shirley Temple", "this cherry-bright Shirley Temple", "a sweet Shirley Temple"],
+  lemonade:      ["this lemonade", "a glass of tart lemonade", "the fresh-squeezed lemonade", "this sun-cooled lemonade", "a cold glass of lemonade"],
+  gin:           ["this gin", "a glass of gin", "the juniper-bright gin", "a cold gin over ice", "this neat pour of gin"],
+  ginFizz:       ["this gin fizz", "a glass of gin fizz", "the frothy gin fizz", "this citrus-bright gin fizz", "a cold gin fizz"],
+  empty:         ["this empty glass", "this drained glass", "the last melting ice", "this hollow glass"],
 };
-const pickCap = arr => arr[(Math.random()*arr.length)|0];
+const pickCap  = arr => arr[(Math.random()*arr.length)|0];
+const capFirst = s => s.charAt(0).toUpperCase() + s.slice(1);
 let legendTimer = 0;
 function showLegend(){
   const el  = $('legend');
   const liq = $('liquid').value;
-  el.textContent = [
-    pickCap(DRINK_LINE[liq] || DRINK_LINE.water),
-    pickCap(SETTING_LINE[$('canopy').value] || SETTING_LINE[0]),
-    pickCap(TIME_LINE[$('tod').value] || TIME_LINE.goldenAfternoon),
-  ].join('\n');
-  el.classList.add('show');
-  clearTimeout(legendTimer);
-  legendTimer = setTimeout(() => el.classList.remove('show'), 7000);
-}
-// H replays the deal's haiku without recomposing it (unless there is none yet)
-function revealLegend(){
-  const el = $('legend');
-  if(!el.textContent){ showLegend(); return; }
+  const d   = pickCap(DRINK_PHRASES[liq] || DRINK_PHRASES.water);
+  const loc = pickCap(LOC_PHRASES[$('canopy').value] || LOC_PHRASES[0]);
+  const t   = pickCap(TIME_PHRASES[$('tod').value] || TIME_PHRASES.goldenAfternoon);
+  el.textContent = liq === 'empty'
+    ? `${capFirst(d)} sits ${loc}, ${t}.`
+    : `Enjoy ${d} ${loc}, ${t}.`;
   el.classList.add('show');
   clearTimeout(legendTimer);
   legendTimer = setTimeout(() => el.classList.remove('show'), 7000);
