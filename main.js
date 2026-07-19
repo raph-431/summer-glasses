@@ -252,7 +252,7 @@ $('tod').addEventListener('change', e => { $('leaf').value = TIMES[e.target.valu
 // liquid scatters back; n the refractive index.
 // ---------------------------------------------------------------------------
 const LIQUIDS = {
-  cola:      { hex:'#541c17', turb:0.04, n:1.34, fizz:0.80, scat:'#8a4a28' },
+  soda:      { hex:'#541c17', turb:0.04, n:1.34, fizz:0.80, scat:'#8a4a28' },
   oj:        { hex:'#e08a1e', turb:0.95, n:1.35, fizz:0.00, scat:'#f2a83c' },
   water:     { hex:'#f2f6f4', turb:0.00, n:1.33, fizz:0.00, scat:'#ffffff' },
   sparkling: { hex:'#f0f3ea', turb:0.02, n:1.33, fizz:1.20, scat:'#f5f2df' },
@@ -260,12 +260,20 @@ const LIQUIDS = {
   redWine:   { hex:'#4a0e18', turb:0.10, n:1.36, fizz:0.00, scat:'#7a1f2c' },
   rose:      { hex:'#e89aa0', turb:0.05, n:1.36, fizz:0.00, scat:'#f0b6ba' },
   whiskey:   { hex:'#b05e14', turb:0.02, n:1.36, fizz:0.00, scat:'#d08428' },
-  mojito:    { hex:'#c9e4b4', turb:0.35, n:1.34, fizz:0.90, scat:'#d8eec2' },
+  mojito:    { hex:'#c9e4b4', turb:0.35, n:1.34, fizz:0.55, scat:'#d8eec2' },
   blueLagoon:{ hex:'#1e6fd8', turb:0.08, n:1.34, fizz:0.60, scat:'#4a9ae8' },
   icedTea:   { hex:'#8a4514', turb:0.06, n:1.34, fizz:0.00, scat:'#b06a2a' },
+  champagne: { hex:'#eedc9a', turb:0.03, n:1.34, fizz:1.35, scat:'#f5ecb4' },
+  spritz:    { hex:'#e0561e', turb:0.30, n:1.34, fizz:0.70, scat:'#f08a46' },
+  pastis:    { hex:'#ece0a6', turb:0.85, n:1.34, fizz:0.00, scat:'#f4ecc0' },
+  appleJuice:{ hex:'#d8a428', turb:0.30, n:1.34, fizz:0.00, scat:'#ecc45e' },
+  shirleyTemple:{ hex:'#cc2440', turb:0.10, n:1.34, fizz:0.85, scat:'#e8637a' },
+  lemonade:  { hex:'#f0e8a0', turb:0.50, n:1.34, fizz:0.30, scat:'#f7f0bc' },
+  gin:       { hex:'#f2f6f4', turb:0.00, n:1.36, fizz:0.00, scat:'#ffffff' },
+  ginFizz:   { hex:'#edeed6', turb:0.40, n:1.34, fizz:1.10, scat:'#f5f5e2' },
   empty:     { hex:'#f2f6f4', turb:0.00, n:1.33, fizz:0.00, scat:'#ffffff', empty:true },
 };
-let liquid = LIQUIDS.cola;
+let liquid = LIQUIDS.soda;
 $('liquid').addEventListener('change', e => {
   liquid = LIQUIDS[e.target.value];
   $('colaCol').value = liquid.hex;
@@ -286,6 +294,68 @@ function profR(y){
 }
 
 // ---------------------------------------------------------------------------
+// LEGEND — a one-line caption composed from the scene state (drink, canopy,
+// time of day), shown on load and on every deal, fading after ten seconds.
+// ---------------------------------------------------------------------------
+const TIME_PHRASES = {
+  dawn:            ["at dawn", "at first light", "at sunrise", "in the pale morning haze"],
+  morning:         ["in the cool of early morning", "in the fresh morning light", "before the heat sets in"],
+  noon:            ["at high noon", "under the midday sun", "in the heat of noon", "in broad daylight"],
+  goldenAfternoon: ["during the golden hour", "in the late afternoon", "in the slanting afternoon light", "in the honeyed afternoon light"],
+  sunset:          ["at sunset", "as the sun sets", "in the last light of day", "as the light fades"],
+  dusk:            ["during the blue hour", "at twilight", "in the violet dusk", "at dusk's first hour", "in the gathering dark"],
+  night:           ["at nightfall", "under the stars", "in the warm night air", "at midnight", "in the glow of string lights"],
+};
+const LOC_PHRASES = {
+  0: ["on the terrasse, in dappled shade", "beneath the broad-leafed canopy", "in the tree's mottled shade", "under the leafy awning"],
+  1: ["beneath the lace of leaves", "in the fine dappled light", "under the feathery canopy", "beneath the acacia's thin shade"],
+  2: ["beneath the palms", "in the shade of the palm fronds", "under swaying palms", "poolside beneath the palms"],
+  3: ["under the pergola", "on the terrasse, beneath the pergola", "in the pergola's striped shade", "on the vine-covered terrace"],
+  4: ["beneath the parasol", "under the umbrella's shade", "at a shaded table", "beneath the striped parasol"],
+};
+// each drink: noun-phrases that slot into "Enjoy ___ {location}, {time}."
+// "empty" is special-cased below (different verb, no "Enjoy"). Avoid trailing
+// appositive commas — the template appends the next clause with just a space.
+const DRINK_PHRASES = {
+  soda:          ["this soda", "this ice-cold soda", "the fizzing soda", "a glass of soda", "this dark, bubbling soda", "a cold pour of soda"],
+  oj:            ["this orange juice", "a glass of fresh orange juice", "the sun-bright orange juice", "this cold-pressed orange juice", "a tall glass of orange juice"],
+  water:         ["this water", "a glass of cold water", "this ice water", "the clear water", "a cool glass of water"],
+  sparkling:     ["this sparkling water", "the fizzing water", "this glass of bubbles", "the chilled sparkling water", "this bright, bubbling water"],
+  whiteWine:     ["this white wine", "a chilled glass of white wine", "the pale white wine", "this crisp white wine", "a cold glass of white wine"],
+  redWine:       ["this red wine", "a glass of red wine", "the deep red wine", "this bold red wine", "a dark glass of red wine"],
+  rose:          ["this rosé", "a chilled glass of rosé", "the pale pink wine", "this summer rosé", "a cold glass of rosé"],
+  whiskey:       ["this whiskey", "a glass of whiskey", "the amber whiskey", "this neat pour of whiskey", "a dram of whiskey"],
+  mojito:        ["this mojito", "the minted mojito", "a cold mojito", "this mint-fizzed mojito", "a glass of mojito with clinking ice"],
+  blueLagoon:    ["this blue lagoon", "the electric-blue lagoon", "a glass of blue lagoon", "this ocean-blue cocktail", "the vivid blue lagoon"],
+  icedTea:       ["this iced tea", "a tall glass of iced tea", "the amber iced tea", "this cold-brewed tea", "a cool glass of iced tea"],
+  champagne:     ["this champagne", "a glass of champagne", "the chilled champagne", "this glass of bubbly", "a flute of champagne"],
+  spritz:        ["this spritz", "the bittersweet spritz", "a glass of spritz", "this bright orange spritz", "a cold spritz"],
+  pastis:        ["this pastis", "a glass of pastis", "the cloudy pastis", "this anise-clouded pastis", "a louche glass of pastis"],
+  appleJuice:    ["this apple juice", "a glass of apple juice", "the crisp apple juice", "this cold-pressed apple juice", "a tall glass of apple juice"],
+  shirleyTemple: ["this Shirley Temple", "a glass of Shirley Temple", "the pink Shirley Temple", "this cherry-bright Shirley Temple", "a sweet Shirley Temple"],
+  lemonade:      ["this lemonade", "a glass of tart lemonade", "the fresh-squeezed lemonade", "this sun-cooled lemonade", "a cold glass of lemonade"],
+  gin:           ["this gin", "a glass of gin", "the juniper-bright gin", "a cold gin over ice", "this neat pour of gin"],
+  ginFizz:       ["this gin fizz", "a glass of gin fizz", "the frothy gin fizz", "this citrus-bright gin fizz", "a cold gin fizz"],
+  empty:         ["this empty glass", "this drained glass", "the last melting ice", "this hollow glass"],
+};
+const pickCap  = arr => arr[(Math.random()*arr.length)|0];
+const capFirst = s => s.charAt(0).toUpperCase() + s.slice(1);
+let legendTimer = 0;
+function showLegend(){
+  const el  = $('legend');
+  const liq = $('liquid').value;
+  const d   = pickCap(DRINK_PHRASES[liq] || DRINK_PHRASES.water);
+  const loc = pickCap(LOC_PHRASES[$('canopy').value] || LOC_PHRASES[0]);
+  const t   = pickCap(TIME_PHRASES[$('tod').value] || TIME_PHRASES.goldenAfternoon);
+  el.textContent = liq === 'empty'
+    ? `${capFirst(d)} sits ${loc}, ${t}.`
+    : `Enjoy ${d} ${loc}, ${t}.`;
+  el.classList.add('show');
+  clearTimeout(legendTimer);
+  legendTimer = setTimeout(() => el.classList.remove('show'), 7000);
+}
+
+// ---------------------------------------------------------------------------
 // RANDOMIZE — deal one coherent random glass. Every choice is applied by
 // setting the DOM controls, so the panel always reflects the real state and
 // frame()'s per-frame reads pick everything up with no parallel state.
@@ -301,17 +371,18 @@ function mulberry32(a){
 const pick = (r, arr) => arr[Math.min(Math.floor(r()*arr.length), arr.length - 1)];
 const rng  = (r, a, b) => a + r()*(b - a);
 
-// what belongs in what: no cola martinis, no ice in the wine
+// what belongs in what: no soda martinis, no ice in the wine
 const SHAPE_LIQUIDS = {
-  highball: ['cola','oj','water','sparkling','mojito','blueLagoon','icedTea'],
-  rocks:    ['whiskey','cola','icedTea','empty','blueLagoon'],
-  shot:     ['whiskey','empty','water'],
-  barrel:   ['cola','oj','icedTea','water','mojito'],
-  flared:   ['oj','water','sparkling','rose','icedTea'],
-  wine:     ['redWine','whiteWine','rose','empty'],
-  martini:  ['blueLagoon','rose','whiteWine','empty'],
-  flute:    ['sparkling','rose','whiteWine'],
-  goblet:   ['redWine','mojito','blueLagoon','cola','water'],
+  highball: ['soda','oj','water','sparkling','mojito','blueLagoon','icedTea',
+             'pastis','lemonade','shirleyTemple','ginFizz','appleJuice'],
+  rocks:    ['whiskey','soda','icedTea','empty','blueLagoon','gin'],
+  shot:     ['whiskey','empty','water','gin'],
+  barrel:   ['soda','oj','icedTea','water','mojito','appleJuice','lemonade','shirleyTemple'],
+  flared:   ['oj','water','sparkling','rose','icedTea','lemonade','appleJuice','pastis','ginFizz'],
+  wine:     ['redWine','whiteWine','rose','empty','spritz'],
+  martini:  ['blueLagoon','rose','whiteWine','empty','gin'],
+  flute:    ['sparkling','rose','whiteWine','champagne'],
+  goblet:   ['redWine','mojito','blueLagoon','soda','water','spritz','appleJuice'],
 };
 const SHAPE_PATTERNS = {
   highball: ['1','2','3','0','4'], rocks: ['1','0','2','4'], shot: ['3','2','0','1'],
@@ -324,7 +395,8 @@ const GLASS_TINTS = ['#eefbf1','#eefbf1','#eefbf1','#e8f2fa','#f8ece8','#eaf6e2'
 const SAT_TINTS = ['#2e62c9','#1f8f8a','#c98a2e','#c02e48','#7a8f2e',
                    '#7a4fc0','#5a5a60','#d06a8a'];
 const RIM_ODDS = { wine:0.35, martini:0.35, flute:0.40, goblet:0.30 };
-const COLD_LIQS = ['cola','water','icedTea','mojito','blueLagoon','oj','sparkling','whiskey'];
+const COLD_LIQS = ['soda','water','icedTea','mojito','blueLagoon','oj','sparkling','whiskey',
+                   'gin','lemonade','shirleyTemple','ginFizz'];
 
 let seed = (Math.random()*2**31)|0;
 let spillSeed = Math.random();      // puddle outline: fresh on every load too
@@ -377,7 +449,8 @@ function randomize(){
   const todName = pick(r, Object.keys(TIMES));
   $('tod').value = todName;
   const tPick = r();
-  $('table').value = tPick < 0.45 ? '0' : tPick < 0.75 ? '1' : tPick < 0.90 ? '2' : '3';
+  $('table').value = tPick < 0.45 ? '0' : tPick < 0.60 ? '1' : tPick < 0.75 ? '4'
+                   : tPick < 0.90 ? '2' : '3';
   const cPick = r();
   $('canopy').value = cPick < 0.40 ? '0' : cPick < 0.60 ? '1' : cPick < 0.75 ? '2'
                     : cPick < 0.90 ? '3' : '4';
@@ -387,8 +460,10 @@ function randomize(){
   spillSeed = r();
   canRot = r()*6.2832;
   tabRot = r()*6.2832;
+  showLegend();
 }
 $('rand').addEventListener('click', randomize);
+showLegend();   // caption the opening scene too
 // dev hook: load index.html#randtest to hammer the randomizer for errors
 if(location.hash === '#randtest'){ for(let i=0;i<60;i++) randomize(); }
 
@@ -574,7 +649,6 @@ audioBtn.addEventListener('click', () => {
   if(AU.ctx.state === 'suspended') AU.ctx.resume();
   const on = audioBtn.classList.toggle('on');
   AU.master.gain.setTargetAtTime(on ? 0.45 : 0.0, AU.ctx.currentTime, 0.4);
-  audioBtn.textContent = on ? '🔊 cicadas' : '🔈 cicadas';
 });
 
 const start = performance.now();

@@ -820,7 +820,7 @@ uniform vec3  u_ambL;        // table ambient filtered through leaves
 uniform vec3  u_backCol;     // blown-out backdrop
 uniform float u_pen;         // shadow penumbra scale (noon hard, dusk soft)
 uniform float u_night;       // 1 = night: string lights + stars in the sky
-uniform float u_table;       // 0 stone, 1 wood planks, 2 glazed tiles, 3 concrete
+uniform float u_table;       // 0 stone, 1 wood planks, 2 glazed tiles, 3 concrete, 4 pale wood
 uniform float u_tabRot;      // per-deal spin of the plank direction
 in vec2 v_uv;
 out vec4 o;
@@ -1442,19 +1442,23 @@ void main(){
       albedo *= 0.985 + 0.03*(hash12(floor(P.xz*220.0)) - 0.5);
       float vein = smoothstep(0.014, 0.0, abs(fbm(P.xz*1.9 + 4.2) - 0.52));
       albedo += vec3(0.028, 0.027, 0.024)*vein;
-    } else if(u_table < 1.5){
+    } else if(u_table < 1.5 || u_table > 3.5){
       // wood planks: per-plank tone, long grain, dark seams. The seams
       // waver a little — sawn boards, not a ruled grid — and the board
-      // direction spins per deal
+      // direction spins per deal. u_table 4 is the pale variety (ash/
+      // birch): lighter base, gentler grain, seams that don't go as dark
+      float lite = step(3.5, u_table);
       float pw = 0.34;
       float ctb = cos(u_tabRot), stb = sin(u_tabRot);
       vec2 wp = mat2(ctb, -stb, stb, ctb)*P.xz;
       float wx = wp.x + 0.020*(fbm(vec2(wp.y*1.8, 7.7)) - 0.5);
       float plank = floor(wx/pw);
-      vec3 wood = vec3(0.72, 0.55, 0.40)*(0.82 + 0.14*hash12(vec2(plank, 3.7)));
-      wood *= 0.88 + 0.20*fbm(vec2(wp.x*30.0, wp.y*2.4) + plank*11.0);
+      vec3 base = mix(vec3(0.72, 0.55, 0.40), vec3(0.90, 0.80, 0.64), lite);
+      vec3 wood = base*(0.82 + 0.14*hash12(vec2(plank, 3.7)));
+      wood *= mix(0.88, 0.93, lite) + mix(0.20, 0.13, lite)
+              * fbm(vec2(wp.x*30.0, wp.y*2.4) + plank*11.0);
       float edgeD = (0.5 - abs(fract(wx/pw) - 0.5))*pw;
-      albedo = wood * mix(0.55, 1.0, smoothstep(0.004, 0.022, edgeD));
+      albedo = wood * mix(mix(0.55, 0.70, lite), 1.0, smoothstep(0.004, 0.022, edgeD));
     } else if(u_table < 2.5){
       // glazed tiles: grid, grout, per-tile hue jitter, glossy faces —
       // domain-warped so the grout lines wander like handmade zellige

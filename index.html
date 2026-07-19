@@ -26,27 +26,48 @@
     font:11px inherit; color:#3a3733; background:rgba(255,255,255,.7);
     border:1px solid rgba(120,90,50,.3); border-radius:6px; padding:2px 4px;
   }
-  #audioBtn, #rand {
+  #rand {
     margin:2px 4px 4px 0; padding:4px 10px; font:12px inherit; cursor:pointer;
     border:1px solid rgba(120,90,50,.35); border-radius:8px;
     background:rgba(255,255,255,.6); color:#3a3733;
   }
-  #audioBtn.on { background:#a5763a; color:#fff; }
+  #audioBtn {
+    position:fixed; right:26px; bottom:22px; z-index:2;
+    padding:0; border:none; background:none; cursor:pointer;
+    font:14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color:rgba(255,255,255,.65);
+    text-shadow:0 1px 8px rgba(20,15,10,.5);
+    user-select:none;
+  }
+  #audioBtn:hover { color:rgba(255,255,255,.9); }
+  #audioBtn.on { color:rgba(255,235,200,.95); }
   #ui .grp { margin-top:8px; padding-top:5px; border-top:1px solid rgba(120,90,50,.18); }
   #ui .grp h2 {
     margin:0 0 2px; font-size:10px; font-weight:600; opacity:.5;
     text-transform:uppercase; letter-spacing:.07em;
   }
   #err { position:fixed; inset:0; display:none; place-items:center; color:#333; font:14px sans-serif; }
+  #legend {
+    display:none; /* legend parked for now — delete this line to bring it back */
+    position:fixed; left:50%; bottom:8%; transform:translateX(-50%);
+    z-index:2; max-width:72vw; text-align:center;
+    font:italic 17px/1.5 Georgia, "Times New Roman", serif;
+    color:rgba(255,255,255,.93);
+    text-shadow:0 1px 10px rgba(20,15,10,.55), 0 0 2px rgba(20,15,10,.35);
+    opacity:0; transition:opacity 1.8s ease; pointer-events:none; user-select:none;
+  }
+  #legend.show { opacity:1; }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="err">This demo needs WebGL2 with float render targets.</div>
-<div id="ui">
+<div id="legend"></div>
+<button id="audioBtn">sound on/off</button>
+<div id="ui" style="display:none">
   <h1>Simulated caustics — summer glasses</h1>
-  <div class="hint">photons traced through the glass each frame<br>drag to orbit — ✦ deals a new glass<br>H hides this panel · S saves a PNG · R randomizes</div>
-  <button id="audioBtn">🔈 cicadas</button><button id="rand">✦ randomize</button>
+  <div class="hint">photons traced through the glass each frame<br>drag to orbit — ✦ deals a new glass<br>H toggles this panel · S saves a PNG · R randomizes</div>
+  <button id="rand">✦ randomize</button>
   <div class="grp"><h2>glass</h2>
     <label><span>glass shape</span><select id="shape">
       <option value="highball" selected>highball</option>
@@ -81,7 +102,7 @@
   </div>
   <div class="grp"><h2>liquid</h2>
     <label><span>liquid</span><select id="liquid">
-      <option value="cola" selected>cola</option>
+      <option value="soda" selected>soda</option>
       <option value="oj">orange juice</option>
       <option value="water">water</option>
       <option value="sparkling">sparkling</option>
@@ -92,6 +113,14 @@
       <option value="mojito">mojito</option>
       <option value="blueLagoon">blue lagoon</option>
       <option value="icedTea">iced tea</option>
+      <option value="champagne">champagne</option>
+      <option value="spritz">spritz</option>
+      <option value="pastis">pastis</option>
+      <option value="appleJuice">apple juice</option>
+      <option value="shirleyTemple">shirley temple</option>
+      <option value="lemonade">lemonade</option>
+      <option value="gin">gin</option>
+      <option value="ginFizz">gin fizz</option>
       <option value="empty">empty</option>
     </select></label>
     <label><span>fill level</span><input id="liq" type="range" min="0.10" max="0.90" step="0.01" value="0.48"></label>
@@ -125,7 +154,8 @@
     </select></label>
     <label><span>table</span><select id="table">
       <option value="0" selected>stone</option>
-      <option value="1">wood</option>
+      <option value="1">dark wood</option>
+      <option value="4">light wood</option>
       <option value="2">tiles</option>
       <option value="3">concrete</option>
     </select></label>
