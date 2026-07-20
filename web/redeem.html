@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Summer Glasses — redeem</title>
+<style>
+  html, body { margin:0; min-height:100%; background:#b9b6b3; }
+  body {
+    font:14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color:#3a3733; display:grid; place-items:start center; padding:48px 16px;
+  }
+  main { max-width:520px; width:100%; }
+  h1 { font:italic 24px Georgia, serif; font-weight:normal; margin:0 0 4px; }
+  .sub { opacity:.65; margin-bottom:24px; }
+  .card {
+    background:rgba(255,255,255,.55); backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,.6);
+    border-radius:14px; box-shadow:0 4px 24px rgba(60,50,40,.18);
+    padding:20px 22px; margin-bottom:16px;
+  }
+  input[type=text] {
+    width:100%; box-sizing:border-box; font:14px ui-monospace, Menlo, monospace;
+    padding:9px 11px; border-radius:9px; border:1px solid rgba(120,90,50,.35);
+    background:rgba(255,255,255,.75); color:#3a3733;
+  }
+  button {
+    font:14px inherit; padding:9px 18px; cursor:pointer; border-radius:9px;
+    border:1px solid rgba(120,90,50,.35); background:rgba(255,255,255,.7); color:#3a3733;
+  }
+  button:disabled { opacity:.45; cursor:default; }
+  button.primary { background:#3a3733; color:#f5f2ee; border-color:#3a3733; }
+  .muted { opacity:.6; font-size:12.5px; }
+  .ok { color:#2f6b3a; }
+  .err { color:#8c2f2f; }
+  .code {
+    font:13px/1.7 ui-monospace, Menlo, monospace; background:rgba(255,255,255,.7);
+    border:1px dashed rgba(120,90,50,.4); border-radius:10px; padding:10px 12px;
+    word-break:break-all; user-select:all; margin:8px 0;
+  }
+  label.ck { display:flex; gap:8px; align-items:flex-start; margin:12px 0; cursor:pointer; }
+  #reveal { position:fixed; inset:0; z-index:10; display:none; background:#000; }
+  #reveal iframe { width:100%; height:100%; border:0; }
+  #reveal .tag {
+    position:fixed; left:50%; transform:translateX(-50%); bottom:20px; z-index:11;
+    font:italic 15px Georgia, serif; color:rgba(255,255,255,.85);
+    text-shadow:0 1px 8px rgba(0,0,0,.6); pointer-events:none;
+    opacity:0; transition:opacity 2s ease 1.5s;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>redeem your summer glass</h1>
+  <div class="sub">someone left a glass of something cold waiting for you. The pour happens the moment you redeem — nobody, including them, knows yet which glass it is.</div>
+
+  <div class="card">
+    <b>1 · the code</b>
+    <p class="muted">Paste the gift code (or arrive here from the gift link and it fills in itself).</p>
+    <input type="text" id="codeIn" placeholder="XXXX-XXXX-XXXX-…" autocomplete="off" spellcheck="false">
+    <div id="codeMsg" class="muted" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card" id="step-to" style="display:none">
+    <b>2 · where should it live?</b>
+    <p class="muted">An Ethereum address you own. No wallet? Create a fresh one right here.</p>
+    <input type="text" id="toIn" placeholder="0x…" autocomplete="off" spellcheck="false">
+    <div style="margin-top:10px"><button id="fresh">create a fresh wallet for me</button></div>
+    <div id="freshBox" style="display:none">
+      <div class="muted" style="margin-top:10px">Your new wallet. The <b>private key below is the only key</b> to your artwork — save it before continuing (password manager, printed, anywhere safe).</div>
+      <div class="code" id="freshAddr"></div>
+      <div class="code" id="freshKey"></div>
+      <button id="downloadKey">download key file</button>
+      <label class="ck"><input type="checkbox" id="freshSaved"> <span>I saved the private key.</span></label>
+    </div>
+    <div id="toMsg" class="muted" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card" id="step-go" style="display:none">
+    <b>3 · pour it</b>
+    <p class="muted">Gas is already covered by the person who gave you this.</p>
+    <button id="go" class="primary">redeem my glass</button>
+    <div id="goMsg" class="muted" style="margin-top:8px"></div>
+  </div>
+</main>
+
+<div id="reveal"><iframe id="frame" allow="autoplay"></iframe><div class="tag" id="tag"></div></div>
+
+<script src="vendor/sha3.js"></script>
+<script type="module">
+import CONFIG from './config.js';
+import { decodeCode, addressOf, signDigest, newClaimKey, bytesToHex, checksumAddress } from './lib/claim.js';
+import { ethCall, selector, padAddress, decodeString } from './lib/rpc.js';
+
+const $ = id => document.getElementById(id);
+let priv = null, claimAddr = null;
+
+async function checkCode(){
+  const raw = $('codeIn').value.trim();
+  priv = null; claimAddr = null;
+  if(!raw){ $('codeMsg').textContent = ''; return; }
+  const key = decodeCode(raw);
+  if(!key){
+    $('codeMsg').textContent = 'that does not look like a valid code (typo?)';
+    $('codeMsg').className = 'err'; return;
+  }
+  const addr = addressOf(key);
+  try {
+    const slot = await ethCall(CONFIG.rpc, CONFIG.contract,
+      selector('gifts(address)') + padAddress(addr));
+    const payer = '0x' + slot.slice(2 + 24, 2 + 64);
+    if(/^0+$/.test(payer)){
+      $('codeMsg').textContent = 'this code has no waiting gift — it may already be redeemed.';
+      $('codeMsg').className = 'err'; return;
+    }
+    priv = key; claimAddr = addr;
+    $('codeMsg').textContent = '✓ a glass is waiting for this code';
+    $('codeMsg').className = 'ok';
+    $('step-to').style.display = 'block';
+    $('step-go').style.display = 'block';
+  } catch(e){
+    $('codeMsg').textContent = 'could not reach the chain: ' + e.message;
+    $('codeMsg').className = 'err';
+  }
+}
+$('codeIn').addEventListener('input', () => { clearTimeout(window._t); window._t = setTimeout(checkCode, 400); });
+
+// arriving via the gift link: #k=<code>, kept in the fragment (never sent to a server)
+const m = location.hash.match(/k=([1-9A-HJ-NP-Za-km-z-]+)/);
+if(m){ $('codeIn').value = m[1]; checkCode(); }
+
+// fresh-wallet path for recipients with nothing set up yet
+$('fresh').addEventListener('click', () => {
+  const key = newClaimKey();               // same CSPRNG path as claim keys
+  const addr = addressOf(key);
+  $('freshBox').style.display = 'block';
+  $('freshAddr').textContent = addr;
+  $('freshKey').textContent = bytesToHex(key);
+  $('toIn').value = addr;
+  $('downloadKey').onclick = () => {
+    const blob = new Blob([
+      `summer glasses — wallet\naddress: ${addr}\nprivate key: ${bytesToHex(key)}\n` +
+      `\nKeep this file safe and private. The private key controls the wallet.\n`,
+    ], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'summer-glass-wallet.txt';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  };
+});
+
+$('go').addEventListener('click', async () => {
+  const to = $('toIn').value.trim();
+  if(!/^0x[0-9a-fA-F]{40}$/.test(to)){
+    $('goMsg').textContent = 'enter a valid address first'; $('goMsg').className = 'err'; return;
+  }
+  if($('freshBox').style.display === 'block' && !$('freshSaved').checked){
+    $('goMsg').textContent = 'save your new wallet key first (checkbox above)'; $('goMsg').className = 'err'; return;
+  }
+  if(!priv){ $('goMsg').textContent = 'enter the gift code first'; $('goMsg').className = 'err'; return; }
+  $('go').disabled = true;
+  $('goMsg').className = 'muted';
+  try {
+    $('goMsg').textContent = 'signing…';
+    const digest = await ethCall(CONFIG.rpc, CONFIG.contract,
+      selector('redeemDigest(address)') + padAddress(to));
+    const sig = await signDigest(priv, digest);
+    $('goMsg').textContent = 'pouring…';
+    const res = await fetch(CONFIG.relayer + '/redeem', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ claimAddr, to, sig }),
+    });
+    const out = await res.json();
+    if(!res.ok) throw new Error(out.error || 'relayer error');
+    $('goMsg').textContent = 'minted — fetching your glass from the chain…';
+    await revealToken(out.tokenId);
+  } catch(e){
+    $('goMsg').textContent = 'redeem failed: ' + (e.message || e);
+    $('goMsg').className = 'err';
+    $('go').disabled = false;
+  }
+});
+
+async function revealToken(tokenId){
+  const uriHex = await ethCall(CONFIG.rpc, CONFIG.contract,
+    selector('tokenURI(uint256)') + tokenId.toString(16).padStart(64, '0'));
+  const uri = decodeString(uriHex);
+  const meta = JSON.parse(atob(uri.split(',')[1]));
+  $('frame').src = meta.animation_url;
+  $('tag').textContent = meta.name + ' — yours';
+  $('reveal').style.display = 'block';
+  requestAnimationFrame(() => { $('tag').style.opacity = 1; });
+  setTimeout(() => { $('tag').style.opacity = 0; }, 12000);
+}
+</script>
+</body>
+</html>

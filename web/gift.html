@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Summer Glasses — give one</title>
+<style>
+  html, body { margin:0; min-height:100%; background:#b9b6b3; }
+  body {
+    font:14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color:#3a3733; display:grid; place-items:start center; padding:48px 16px;
+  }
+  main { max-width:520px; width:100%; }
+  h1 { font:italic 24px Georgia, serif; font-weight:normal; margin:0 0 4px; }
+  .sub { opacity:.65; margin-bottom:24px; }
+  .card {
+    background:rgba(255,255,255,.55); backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,.6);
+    border-radius:14px; box-shadow:0 4px 24px rgba(60,50,40,.18);
+    padding:20px 22px; margin-bottom:16px;
+  }
+  button {
+    font:14px inherit; padding:9px 18px; cursor:pointer; border-radius:9px;
+    border:1px solid rgba(120,90,50,.35); background:rgba(255,255,255,.7); color:#3a3733;
+  }
+  button:disabled { opacity:.45; cursor:default; }
+  button.primary { background:#3a3733; color:#f5f2ee; border-color:#3a3733; }
+  .code {
+    font:15px/1.8 ui-monospace, Menlo, monospace; letter-spacing:.04em;
+    background:rgba(255,255,255,.7); border:1px dashed rgba(120,90,50,.4);
+    border-radius:10px; padding:12px 14px; word-break:break-all; user-select:all;
+  }
+  .warn { font-size:12.5px; opacity:.75; margin-top:10px; }
+  label.ck { display:flex; gap:8px; align-items:flex-start; margin:14px 0; cursor:pointer; }
+  .muted { opacity:.6; font-size:12.5px; }
+  .err { color:#8c2f2f; }
+  #card-print { display:none; }
+  @media print {
+    body > main > * { display:none !important; }
+    #card-print {
+      display:block !important; border:1px solid #999; border-radius:12px;
+      padding:28px; max-width:420px; margin:40px auto; font-size:13px;
+    }
+    #card-print h2 { font:italic 20px Georgia, serif; font-weight:normal; margin:0 0 2px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>give a summer glass</h1>
+  <div class="sub">a glass of something cold on a sunlit table — dealt at the moment they open it. Not even you will know which one it is.</div>
+
+  <div class="card" id="step-wallet">
+    <div id="netline" class="muted">…</div>
+    <div style="margin-top:10px"><button id="connect" class="primary">connect wallet</button>
+    <span id="acct" class="muted"></span></div>
+  </div>
+
+  <div class="card" id="step-code" style="display:none">
+    <b>1 · the gift code</b>
+    <p class="muted">Generated here in your browser — it never leaves this page. Whoever holds this code owns the gift, like a gift card: save it before paying, share it only with the person it's for.</p>
+    <div class="code" id="code">…</div>
+    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
+      <button id="copyCode">copy code</button>
+      <button id="copyLink">copy redeem link</button>
+      <button id="printCard">print gift card</button>
+    </div>
+    <label class="ck"><input type="checkbox" id="saved"> <span>I've saved the code somewhere safe. If it's lost before payment I can regenerate; after payment a lost code locks the gift for a year (then I can reclaim it).</span></label>
+  </div>
+
+  <div class="card" id="step-pay" style="display:none">
+    <b>2 · prepay the gift</b>
+    <p class="muted" id="priceline">…</p>
+    <button id="pay" class="primary" disabled>pay &amp; create gift</button>
+    <div id="paymsg" class="warn"></div>
+  </div>
+
+  <div class="card" id="step-done" style="display:none">
+    <b>the gift is live 🥂</b>
+    <p class="muted">Hand over the code (or the link, or the printed card). When they redeem, a glass is poured for them on-chain — gas is already covered, they don't need anything but the code.</p>
+    <div class="muted" id="txline"></div>
+  </div>
+
+  <div id="card-print">
+    <h2>a summer glass, for you</h2>
+    <div class="muted" style="margin-bottom:14px">one glass of something cold, on a sunlit table, held on-chain until you pour it</div>
+    <div class="code" id="printCode"></div>
+    <p>redeem it at:<br><span id="printUrl" style="font-family:ui-monospace,Menlo,monospace; font-size:12px"></span></p>
+    <div class="muted">no wallet or fees needed — the code is the key.</div>
+  </div>
+</main>
+
+<script src="vendor/sha3.js"></script>
+<script type="module">
+import CONFIG from './config.js';
+import { newClaimKey, addressOf, encodeCode, bytesToHex } from './lib/claim.js';
+import { ethCall, selector, padAddress, fromWei } from './lib/rpc.js';
+
+const $ = id => document.getElementById(id);
+const show = id => { $(id).style.display = 'block'; };
+
+let account = null, priv = null, claimAddr = null, total = 0n;
+
+$('netline').textContent = `network: ${CONFIG.chainName} · contract ${CONFIG.contract.slice(0,10)}…`;
+
+async function readPrice(){
+  const price = BigInt(await ethCall(CONFIG.rpc, CONFIG.contract, selector('price()')));
+  const stipend = BigInt(await ethCall(CONFIG.rpc, CONFIG.contract, selector('gasStipend()')));
+  total = price + stipend;
+  $('priceline').textContent =
+    `${fromWei(total)} ETH — the piece (${fromWei(price)}) plus the recipient's gas, prepaid (${fromWei(stipend)}).`;
+}
+
+function prepareCode(){
+  priv = newClaimKey();
+  claimAddr = addressOf(priv);
+  const code = encodeCode(priv);
+  const link = new URL('redeem.html#k=' + code, location.href).href;
+  $('code').textContent = code;
+  $('printCode').textContent = code;
+  $('printUrl').textContent = link;
+  $('copyCode').onclick = () => navigator.clipboard.writeText(code);
+  $('copyLink').onclick = () => navigator.clipboard.writeText(link);
+  $('printCard').onclick = () => window.print();
+}
+
+$('saved').addEventListener('change', e => { $('pay').disabled = !e.target.checked || !account; });
+
+$('connect').addEventListener('click', async () => {
+  if(!window.ethereum){ $('acct').textContent = ' no wallet found in this browser'; return; }
+  const [acct] = await window.ethereum.request({ method: 'eth_requestAccounts' });
+  const chain = await window.ethereum.request({ method: 'eth_chainId' });
+  if(parseInt(chain) !== CONFIG.chainId){
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x' + CONFIG.chainId.toString(16) }],
+      });
+    } catch {
+      $('acct').textContent = ` wrong network — please switch to ${CONFIG.chainName}`;
+      return;
+    }
+  }
+  account = acct;
+  $('acct').textContent = ' ' + acct.slice(0, 8) + '…' + acct.slice(-6);
+  $('connect').textContent = 'connected';
+  $('connect').disabled = true;
+  show('step-code'); show('step-pay');
+  prepareCode();
+  readPrice().catch(e => { $('priceline').textContent = 'could not read price: ' + e.message; $('priceline').className = 'err'; });
+});
+
+$('pay').addEventListener('click', async () => {
+  $('pay').disabled = true;
+  $('paymsg').textContent = 'confirm in your wallet…';
+  try {
+    const txHash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from: account,
+        to: CONFIG.contract,
+        value: '0x' + total.toString(16),
+        data: selector('gift(address)') + padAddress(claimAddr),
+      }],
+    });
+    $('paymsg').textContent = 'waiting for confirmation…';
+    for(;;){
+      const r = await window.ethereum.request({ method: 'eth_getTransactionReceipt', params: [txHash] });
+      if(r){
+        if(parseInt(r.status) !== 1) throw new Error('transaction reverted');
+        break;
+      }
+      await new Promise(s => setTimeout(s, 1500));
+    }
+    $('paymsg').textContent = '';
+    $('txline').textContent = 'tx ' + txHash + (CONFIG.explorerTx ? '' : '');
+    if(CONFIG.explorerTx) $('txline').innerHTML = `<a href="${CONFIG.explorerTx}${txHash}">view transaction</a>`;
+    show('step-done');
+  } catch(e){
+    $('paymsg').textContent = 'payment failed: ' + (e.message || e);
+    $('pay').disabled = false;
+  }
+});
+</script>
+</body>
+</html>

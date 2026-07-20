@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {ERC721} from "openzeppelin-contracts/token/ERC721/ERC721.sol";
+import {ERC2981} from "openzeppelin-contracts/token/common/ERC2981.sol";
 import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
 import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import {Base64} from "openzeppelin-contracts/utils/Base64.sol";
@@ -28,7 +29,7 @@ import {SSTORE2} from "./SSTORE2.sol";
 ///    recipient): neither party knows which glass it is until it's poured.
 ///  - a gift never redeemed can be reclaimed by its gifter after a year, so
 ///    lost codes don't strand funds.
-contract SummerGlasses is ERC721, Ownable {
+contract SummerGlasses is ERC721, ERC2981, Ownable {
     using Strings for uint256;
 
     // ---- gifting ---------------------------------------------------------
@@ -71,6 +72,13 @@ contract SummerGlasses is ERC721, Ownable {
     bytes public artSuffix;
     address[] public artChunks;
     bool public artFrozen;
+
+    /// optional marketplace thumbnail: if set, tokenURI adds
+    /// "image": imageBase + tokenId (e.g. "https://render.…/glass/").
+    /// Deliberately NOT under artFrozen — the canonical artwork is the
+    /// frozen animation_url; this is a mutable convenience pointer that can
+    /// be added or improved after launch.
+    string public imageBase;
 
     string public constant DESCRIPTION =
         "A glass of something cold on a sunlit table, dealt from this token's "
@@ -180,6 +188,10 @@ contract SummerGlasses is ERC721, Ownable {
         emit ArtFrozen();
     }
 
+    function setImageBase(string calldata base) external onlyOwner {
+        imageBase = base;
+    }
+
     function artChunkCount() external view returns (uint256) {
         return artChunks.length;
     }
@@ -195,10 +207,13 @@ contract SummerGlasses is ERC721, Ownable {
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         _requireOwned(tokenId);
+        bytes memory img = bytes(imageBase).length == 0
+            ? bytes("")
+            : abi.encodePacked(',"image":"', imageBase, tokenId.toString(), '"');
         bytes memory json = abi.encodePacked(
             '{"name":"Summer Glass #', tokenId.toString(),
-            '","description":"', DESCRIPTION,
-            '","animation_url":"data:text/html;base64,',
+            '","description":"', DESCRIPTION, '"', img,
+            ',"animation_url":"data:text/html;base64,',
             Base64.encode(tokenHTML(seedOf[tokenId])),
             '"}'
         );
@@ -223,6 +238,16 @@ contract SummerGlasses is ERC721, Ownable {
 
     function lockSupply() external onlyOwner {
         supplyLocked = true;
+    }
+
+    /// ERC-2981 marketplace royalty. Unset by default; policy is a launch
+    /// decision — the mechanism has to ship with the contract.
+    function setRoyalty(address receiver, uint96 bps) external onlyOwner {
+        _setDefaultRoyalty(receiver, bps);
+    }
+
+    function supportsInterface(bytes4 id) public view override(ERC721, ERC2981) returns (bool) {
+        return super.supportsInterface(id);
     }
 
     function withdraw() external onlyOwner {

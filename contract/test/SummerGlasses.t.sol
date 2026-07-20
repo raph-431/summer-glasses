@@ -292,6 +292,28 @@ contract SummerGlassesTest is Test {
         );
     }
 
+    function test_TokenURIWithImageBase() public {
+        setTestArt();
+        doGift();
+        glasses.redeem(claimAddr, recipient, claimSig(claimKey, recipient));
+        vm.prank(owner);
+        glasses.setImageBase("https://render.example/glass/");
+        string memory json = string(Base64.decode(_stripJsonPrefix(glasses.tokenURI(1))));
+        assertTrue(vm.contains(json, '"image":"https://render.example/glass/1"'));
+        // image pointer stays mutable after the art freeze
+        vm.startPrank(owner);
+        glasses.freezeArt();
+        glasses.setImageBase("https://better.example/");
+        vm.stopPrank();
+    }
+
+    function _stripJsonPrefix(string memory uri) internal pure returns (string memory) {
+        bytes memory b = bytes(uri);
+        bytes memory out = new bytes(b.length - 29); // len("data:application/json;base64,")
+        for (uint256 i = 0; i < out.length; i++) out[i] = b[i + 29];
+        return string(out);
+    }
+
     function test_TokenURINonexistentReverts() public {
         vm.expectRevert();
         glasses.tokenURI(1);
@@ -314,6 +336,30 @@ contract SummerGlassesTest is Test {
         vm.prank(gifter);
         vm.expectRevert();
         glasses.addArtChunk("nope");
+    }
+
+    // ---- royalty ---------------------------------------------------------
+
+    function test_RoyaltyDefaultZero() public view {
+        (address rcv, uint256 amt) = glasses.royaltyInfo(1, 1 ether);
+        assertEq(rcv, address(0));
+        assertEq(amt, 0);
+    }
+
+    function test_RoyaltySettable() public {
+        vm.prank(owner);
+        glasses.setRoyalty(owner, 500); // 5%
+        (address rcv, uint256 amt) = glasses.royaltyInfo(1, 1 ether);
+        assertEq(rcv, owner);
+        assertEq(amt, 0.05 ether);
+        assertTrue(glasses.supportsInterface(0x2a55205a)); // ERC-2981
+        assertTrue(glasses.supportsInterface(0x80ac58cd)); // ERC-721 still
+    }
+
+    function test_RoyaltyOnlyOwner() public {
+        vm.prank(gifter);
+        vm.expectRevert();
+        glasses.setRoyalty(gifter, 500);
     }
 
     // ---- the real artwork ------------------------------------------------
