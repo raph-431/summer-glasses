@@ -14,8 +14,9 @@
 
   header { padding:40px 24px 8px; text-align:center; }
   h1 {
-    font:italic 26px Georgia, serif; font-weight:normal; margin:0 0 10px;
-    text-shadow:0 1px 14px rgba(255,250,240,.85);
+    font:italic clamp(38px, 7vw, 62px) Georgia, serif; font-weight:normal;
+    margin:0 0 14px; line-height:1.05;
+    text-shadow:0 1px 20px rgba(255,250,240,.9);
   }
   #intro {
     max-width:540px; margin:0 auto 14px; text-align:center;
@@ -31,7 +32,7 @@
   .muted { opacity:.6; font-size:12.5px; }
   .err { color:#8c2f2f; }
 
-  #find { margin:14px auto 0; max-width:420px; display:flex; gap:8px; justify-content:center; }
+  #find { margin:0 auto; max-width:420px; display:flex; gap:8px; justify-content:center; }
   input[type=text] {
     flex:1; min-width:0; font:13px ui-monospace, Menlo, monospace;
     padding:8px 11px; border-radius:9px; border:1px solid rgba(120,90,50,.35);
@@ -42,6 +43,10 @@
     border:1px solid rgba(120,90,50,.35); background:rgba(255,255,255,.7); color:#3a3733;
   }
   #msg { text-align:center; min-height:20px; margin-top:10px; }
+  #foot {
+    max-width:1400px; margin:0 auto; padding:8px 24px 56px; text-align:center;
+  }
+  #foot #sub { margin-bottom:12px; }
   #ways {
     margin-top:16px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;
   }
@@ -118,12 +123,6 @@
       whole inside a contract, so it keeps.</p>
     <p id="ingredients">Ingredients: 100% code, 0% alcohol.</p>
   </div>
-  <div class="muted" id="sub">…</div>
-  <div id="find">
-    <input type="text" id="q" placeholder="a glass number, or a wallet address" autocomplete="off" spellcheck="false">
-    <button id="go">find</button>
-  </div>
-  <div id="msg" class="muted"></div>
   <div id="ways">
     <a class="act primary" href="redeem.html">I have a gift code → pour my glass</a>
     <a class="act" href="gift.html">buy somebody a drink</a>
@@ -131,6 +130,15 @@
 </header>
 
 <div id="grid"></div>
+
+<footer id="foot">
+  <div class="muted" id="sub">…</div>
+  <div id="find">
+    <input type="text" id="q" placeholder="a glass number, or a wallet address" autocomplete="off" spellcheck="false">
+    <button id="go">find</button>
+  </div>
+  <div id="msg" class="muted"></div>
+</footer>
 
 <div id="stage"><iframe id="frame" allow="autoplay"></iframe></div>
 <button id="close" style="display:none">← back to the gallery</button>
