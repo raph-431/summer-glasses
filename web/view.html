@@ -1,0 +1,10 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Summer in a Glass</title>
+<!-- The gallery moved to index.html. Links of the form view.html#3 were handed
+     out at the reveal and printed on gift cards, so this keeps them working —
+     hash and all. Do not delete. -->
+<script>location.replace('index.html' + location.hash + location.search);</script>
+<p style="font:14px -apple-system,sans-serif">Taking you to the gallery…
+  <a id="l" href="index.html">continue</a></p>
+<script>document.getElementById('l').href = 'index.html' + location.hash;</script>

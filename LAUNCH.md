@@ -5,9 +5,10 @@ assumes the local stack already passes:
 
 ```sh
 node build.js                       # fresh dist/ from current art
-cd contract && forge test && cd ..  # 31 tests
+cd contract && forge test && cd ..  # 32 tests
 node web/test/claim-parity.mjs      # browser crypto == cast
 node web/test/e2e-anvil.mjs         # full gift→redeem stack on anvil
+node web/test/redeem-recovery.mjs   # redeem never reports a false failure
 ```
 
 ## 0 · Decisions to make (once, at launch)
@@ -44,9 +45,14 @@ Then wire the pieces:
 1. `web/config.js`: fill `baseSepolia.contract`, switch `export default baseSepolia`.
 2. Relayer (any machine with foundry installed — a $5 VPS is plenty):
    ```sh
-   CONTRACT=0x… RELAYER_PK=0x… RPC_URL=https://sepolia.base.org PORT=8788 \
-   node relayer/relayer.js
+   CONTRACT=0x… RELAYER_ACCOUNT=relayer-sepolia RELAYER_PASSWORD='…' \
+   RPC_URL=https://sepolia.base.org PORT=8788 node relayer/relayer.js
    ```
+   A keystore account **must** be given its password (`RELAYER_PASSWORD`, or
+   `RELAYER_PASSWORD_FILE` for a path). Without one, `cast` opens `/dev/tty`
+   and waits for a prompt nobody is watching — redeems then hang silently.
+   Note `CAST_PASSWORD` is *not* honoured; the relayer writes the password to
+   a 0600 temp file and passes `--password-file` so it never shows in `ps`.
    Put it behind HTTPS (caddy/nginx) and set `baseSepolia.relayer` to that URL.
 3. Serve `web/` from any static host (the pages are plain files).
 

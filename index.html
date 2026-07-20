@@ -26,17 +26,19 @@
     font:11px inherit; color:#3a3733; background:rgba(255,255,255,.7);
     border:1px solid rgba(120,90,50,.3); border-radius:6px; padding:2px 4px;
   }
-  #audioBtn, #infoBtn {
+  #corner {
     position:fixed; right:26px; bottom:22px; z-index:2;
+    display:flex; gap:20px; align-items:baseline;
+  }
+  #corner button {
     padding:0; border:none; background:none; cursor:pointer;
     font:14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     color:rgba(255,255,255,.65);
     text-shadow:0 1px 8px rgba(20,15,10,.5);
     user-select:none;
   }
-  #audioBtn:hover, #infoBtn:hover { color:rgba(255,255,255,.9); }
+  #corner button:hover { color:rgba(255,255,255,.9); }
   #audioBtn.on { color:rgba(255,235,200,.95); }
-  #infoBtn { right:132px; }
   #infoPanel {
     position:fixed; right:22px; bottom:52px; z-index:2; display:none;
     font:13px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -68,12 +70,15 @@
 <canvas id="c"></canvas>
 <div id="err">This demo needs WebGL2 with float render targets.</div>
 <div id="legend"></div>
-<button id="audioBtn">sound on/off</button>
-<button id="infoBtn">info</button>
+<div id="corner">
+  <button id="shotBtn" title="save this frame as a picture">download</button>
+  <button id="infoBtn">info</button>
+  <button id="audioBtn">sound on/off</button>
+</div>
 <div id="infoPanel"></div>
 <div id="ui" style="display:none">
-  <h1>Simulated caustics — summer glasses</h1>
-  <div class="hint">photons traced through the glass each frame<br>drag to orbit · H shows the haiku · S saves a PNG</div>
+  <h1>Simulated caustics — summer in a glass</h1>
+  <div class="hint">photons traced through the glass each frame<br>drag to orbit · H shows the haiku · S (or 'download') saves a PNG</div>
   <div class="grp"><h2>glass</h2>
     <label><span>glass shape</span><select id="shape">
       <option value="highball" selected>highball</option>

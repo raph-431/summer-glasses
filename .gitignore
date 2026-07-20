@@ -14,7 +14,18 @@ contract/out/
 contract/cache/
 contract/broadcast/
 
+# secrets — never commit. Keystore passwords, keys, deploy env files.
+relayer-pw.txt
+*-pw.txt
+*.password
+.env
+.env.*
+
 # editor state
 .vscode/
 .idea/
 *.swp
+
+# VS Code Local History extension
+.history/
+summer-glass-*.jpg

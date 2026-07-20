@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Summer in a Glass</title>
+<link rel="stylesheet" href="sky.css">
+<script src="sky.js"></script>
+<style>
+  body {
+    margin:0; min-height:100vh; background:transparent;
+    font:14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:#3a3733;
+  }
+
+  header { padding:40px 24px 8px; text-align:center; }
+  h1 {
+    font:italic 26px Georgia, serif; font-weight:normal; margin:0 0 10px;
+    text-shadow:0 1px 14px rgba(255,250,240,.85);
+  }
+  #intro {
+    max-width:540px; margin:0 auto 14px; text-align:center;
+    text-shadow:0 1px 12px rgba(255,250,240,.8);
+  }
+  #intro p { margin:0 0 6px; }
+  #intro p.muted { font-size:13px; }
+  /* the small print on the back of the bottle */
+  #ingredients {
+    margin-top:10px; font:11.5px ui-monospace, Menlo, monospace;
+    letter-spacing:.05em; text-transform:uppercase; opacity:.5;
+  }
+  .muted { opacity:.6; font-size:12.5px; }
+  .err { color:#8c2f2f; }
+
+  #find { margin:14px auto 0; max-width:420px; display:flex; gap:8px; justify-content:center; }
+  input[type=text] {
+    flex:1; min-width:0; font:13px ui-monospace, Menlo, monospace;
+    padding:8px 11px; border-radius:9px; border:1px solid rgba(120,90,50,.35);
+    background:rgba(255,255,255,.6); color:#3a3733;
+  }
+  button {
+    font:13px inherit; padding:8px 14px; cursor:pointer; border-radius:9px;
+    border:1px solid rgba(120,90,50,.35); background:rgba(255,255,255,.7); color:#3a3733;
+  }
+  #msg { text-align:center; min-height:20px; margin-top:10px; }
+  #ways {
+    margin-top:16px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;
+  }
+  #ways .act {
+    display:inline-block; font:14px inherit; padding:10px 20px; border-radius:10px;
+    text-decoration:none; cursor:pointer; transition:transform .18s ease, box-shadow .18s ease;
+    border:1px solid rgba(120,90,50,.35); background:rgba(255,255,255,.72); color:#3a3733;
+    box-shadow:0 2px 10px rgba(60,50,40,.10);
+  }
+  #ways .act.primary {
+    background:#3a3733; color:#f5f2ee; border-color:#3a3733;
+    box-shadow:0 4px 16px rgba(60,50,40,.28);
+  }
+  #ways .act:hover { transform:translateY(-2px); box-shadow:0 8px 22px rgba(60,50,40,.24); }
+
+  #grid {
+    display:grid; gap:18px; padding:22px 24px 60px;
+    grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
+    max-width:1400px; margin:0 auto;
+  }
+  .tile {
+    position:relative; aspect-ratio:7/5; border-radius:12px; overflow:hidden;
+    background:rgba(255,255,255,.35); border:1px solid rgba(255,255,255,.55);
+    box-shadow:0 4px 18px rgba(60,50,40,.16); cursor:pointer;
+    transition:transform .25s ease, box-shadow .25s ease;
+  }
+  .tile:hover { transform:translateY(-3px); box-shadow:0 10px 28px rgba(60,50,40,.24); }
+  .tile img { width:100%; height:100%; object-fit:cover; display:block; }
+  .tile .label {
+    position:absolute; left:0; right:0; bottom:0; padding:8px 11px;
+    font-size:12px; color:#fff; text-shadow:0 1px 6px rgba(0,0,0,.7);
+    background:linear-gradient(transparent, rgba(0,0,0,.45));
+    display:flex; justify-content:space-between; gap:8px;
+  }
+  .tile .mine { color:#ffe9b8; }
+  .tile .gesture {
+    position:absolute; left:0; right:0; bottom:30px; padding:0 11px;
+    font:11.5px ui-monospace, Menlo, monospace; color:rgba(255,255,255,.82);
+    text-shadow:0 1px 6px rgba(0,0,0,.75); pointer-events:none;
+  }
+  .tile .gesture .arrow { opacity:.6; }
+  .tile .pending {
+    position:absolute; inset:0; display:grid; place-items:center;
+    font:italic 13px Georgia, serif; opacity:.55;
+  }
+  .tile .pending.failed { font-style:normal; font-size:12px; }
+
+  /* full-screen live view */
+  #stage { position:fixed; inset:0; z-index:10; display:none; background:#000; }
+  #stage iframe { width:100%; height:100%; border:0; }
+  #close {
+    position:fixed; left:18px; top:16px; z-index:12; font:13px inherit;
+    padding:6px 12px; border-radius:8px; color:rgba(255,255,255,.75);
+    background:rgba(0,0,0,.25); border:0; backdrop-filter:blur(6px);
+  }
+  #close:hover { color:#fff; background:rgba(0,0,0,.45); }
+  #stageTag {
+    position:fixed; left:50%; transform:translateX(-50%); bottom:22px; z-index:12;
+    font:italic 15px Georgia, serif; color:rgba(255,255,255,.9);
+    text-shadow:0 1px 8px rgba(0,0,0,.6); pointer-events:none;
+    opacity:0; transition:opacity 1.6s ease;
+  }
+  #stageTag.show { opacity:1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>summer in a glass</h1>
+  <div id="intro">
+    <p>It's summer, it's hot and we all need a break. <br>Let's buy each other drinks
+      and enjoy the quiet life, for a change!</p>
+    <p class="muted">Every drink is a small artwork, poured the moment it is opened,
+       never dealt twice. It is kept
+      whole inside a contract, so it keeps.</p>
+    <p id="ingredients">Ingredients: 100% code, 0% alcohol.</p>
+  </div>
+  <div class="muted" id="sub">…</div>
+  <div id="find">
+    <input type="text" id="q" placeholder="a glass number, or a wallet address" autocomplete="off" spellcheck="false">
+    <button id="go">find</button>
+  </div>
+  <div id="msg" class="muted"></div>
+  <div id="ways">
+    <a class="act primary" href="redeem.html">I have a gift code → pour my glass</a>
+    <a class="act" href="gift.html">buy somebody a drink</a>
+  </div>
+</header>
+
+<div id="grid"></div>
+
+<div id="stage"><iframe id="frame" allow="autoplay"></iframe></div>
+<button id="close" style="display:none">← back to the gallery</button>
+<div id="stageTag"></div>
+
+<script src="vendor/sha3.js"></script>
+<script type="module">
+import CONFIG from './config.js';
+import { fetchMeta, fetchHTML, seedOf, ownerOf, tokensOf, totalMinted, renderInto,
+         shortAddr } from './lib/token.js';
+import { thumbnail } from './lib/thumbs.js';
+
+const $ = id => document.getElementById(id);
+const setMsg = (t, cls = 'muted') => { $('msg').textContent = t; $('msg').className = cls; };
+
+let highlight = null;   // address whose glasses get marked, from #a=
+
+// ---- full-screen live view ------------------------------------------------
+
+async function open_(tokenId){
+  setMsg('reading the chain…');
+  try {
+    const meta = await fetchMeta(CONFIG, tokenId);
+    renderInto($('frame'), meta);
+    $('stage').style.display = 'block';
+    $('close').style.display = 'block';
+    $('stageTag').textContent = meta.name;
+    requestAnimationFrame(() => $('stageTag').classList.add('show'));
+    setTimeout(() => $('stageTag').classList.remove('show'), 9000);
+    document.title = meta.name;
+    if(location.hash !== '#' + tokenId) history.replaceState(null, '', '#' + tokenId);
+    setMsg('');
+  } catch(e){
+    setMsg(/revert/i.test(e.message) ? `no glass #${tokenId} exists yet` : 'could not load it: ' + e.message, 'err');
+  }
+}
+
+function close_(){
+  $('stage').style.display = 'none';
+  $('frame').srcdoc = '';                 // stop its render loop and audio
+  $('close').style.display = 'none';
+  $('stageTag').classList.remove('show');
+  document.title = 'Summer in a Glass';
+  history.replaceState(null, '', location.pathname + (highlight ? '#a=' + highlight : ''));
+}
+$('close').addEventListener('click', close_);
+addEventListener('keydown', e => { if(e.key === 'Escape' && $('stage').style.display === 'block') close_(); });
+
+// ---- the gallery ----------------------------------------------------------
+
+function tile(tokenId){
+  const el = document.createElement('div');
+  el.className = 'tile';
+  el.innerHTML = `<div class="pending">pouring…</div>
+    <div class="label">
+      <span>Summer Glass #${tokenId}</span>
+      <span class="mine"></span>
+    </div>
+    <div class="gesture"><span class="who"></span></div>`;
+  el.onclick = () => open_(tokenId);
+  return el;
+}
+
+/// Tiles render lazily: a glass is only asked for its portrait once its tile
+/// is near the viewport, and thumbs.js caps how many run at once.
+const watcher = new IntersectionObserver((entries) => {
+  for(const entry of entries){
+    if(!entry.isIntersecting) continue;
+    watcher.unobserve(entry.target);
+    fill(entry.target, Number(entry.target.dataset.id));
+  }
+}, { rootMargin: '300px' });
+
+async function fill(el, tokenId){
+  // fire this first and don't await it: rendering a portrait takes seconds,
+  // and the caption shouldn't wait on it
+  ownerOf(CONFIG, tokenId).then(owner => {
+    const who = el.querySelector('.who');
+    who.innerHTML = `<span class="arrow">gifted to</span> ${shortAddr(owner)}`;
+    who.title = owner;
+    if(highlight && owner.toLowerCase() === highlight.toLowerCase())
+      el.querySelector('.mine').textContent = 'yours';
+  }).catch(() => {});
+
+  try {
+    const seed = await seedOf(CONFIG, tokenId);
+    const jpeg = await thumbnail(seed, () => fetchHTML(CONFIG, seed));
+    const img = new Image();
+    img.src = jpeg;
+    img.alt = 'Summer Glass #' + tokenId;
+    el.querySelector('.pending')?.remove();
+    el.prepend(img);
+  } catch(e){
+    const p = el.querySelector('.pending');
+    if(p){ p.textContent = 'tap to view'; p.className = 'pending failed'; }
+  }
+
+}
+
+async function loadGallery(){
+  try {
+    const minted = await totalMinted(CONFIG);
+    $('sub').textContent = minted === 0
+      ? `${CONFIG.chainName} — no glasses poured yet`
+      : `${minted} ${minted === 1 ? 'glass' : 'glasses'} poured so far · ${CONFIG.chainName}`;
+    const grid = $('grid');
+    grid.innerHTML = '';
+    for(let id = minted; id >= 1; id--){        // newest first
+      const el = tile(id);
+      el.dataset.id = id;
+      grid.appendChild(el);
+      watcher.observe(el);
+    }
+  } catch(e){
+    setMsg('could not reach the chain: ' + e.message, 'err');
+  }
+}
+
+// ---- lookup ---------------------------------------------------------------
+
+async function lookupAddress(addr){
+  highlight = addr;
+  setMsg('looking for glasses held by that address…');
+  try {
+    const ids = await tokensOf(CONFIG, addr, (done, total) => setMsg(`checking ${done}/${total}…`));
+    if(!ids.length){ setMsg('that address does not hold a glass (yet)', 'err'); return; }
+    setMsg(ids.length === 1 ? 'found it — marked below' : `found ${ids.length}, marked below`);
+    // mark what is already on screen, then bring theirs into view
+    document.querySelectorAll('.tile').forEach(el => {
+      if(ids.includes(Number(el.dataset.id))) el.querySelector('.mine').textContent = 'yours';
+    });
+    const first = document.querySelector(`.tile[data-id="${ids[0]}"]`);
+    first?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } catch(e){
+    setMsg('lookup failed: ' + e.message, 'err');
+  }
+}
+
+function submit(){
+  const q = $('q').value.trim();
+  if(/^#?\d+$/.test(q)) return open_(parseInt(q.replace('#',''), 10));
+  if(/^0x[0-9a-fA-F]{40}$/.test(q)) return lookupAddress(q);
+  setMsg('enter a glass number (like 1) or a wallet address (0x…)', 'err');
+}
+$('go').addEventListener('click', submit);
+$('q').addEventListener('keydown', e => { if(e.key === 'Enter') submit(); });
+
+// deep links: #1 opens a glass, #a=0x… highlights a collection
+function fromHash(){
+  const h = location.hash.slice(1);
+  if(/^\d+$/.test(h)) return open_(parseInt(h, 10));
+  const m = h.match(/^a=(0x[0-9a-fA-F]{40})$/);
+  if(m){ $('q').value = m[1]; return lookupAddress(m[1]); }
+}
+addEventListener('hashchange', () => {
+  if(!location.hash && $('stage').style.display === 'block') close_();
+  else fromHash();
+});
+
+await loadGallery();
+fromHash();
+</script>
+</body>
+</html>

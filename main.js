@@ -108,6 +108,19 @@ addEventListener('pointercancel', endDrag);
 // exactly one deal per load. The #ui panel is never shown — it stays in the
 // DOM purely as the state store that frame() reads every frame.
 let wantShot = false;
+
+// Snapshot-on-request, for a gallery showing many glasses: an embedder posts
+// {type:'summer-glass-snapshot-request', id} and gets a JPEG data URL back
+// once the caustic accumulation has settled (~10 frames of decay, so 15 is
+// comfortable). Purely a read of already-rendered pixels — it consumes no
+// randomness and cannot change which glass was dealt.
+const SNAP_AFTER = 15;
+let snapReq = null, snapFrames = 0;
+addEventListener('message', e => {
+  if(e.data && e.data.type === 'summer-glass-snapshot-request'){
+    snapReq = e.data; snapFrames = 0;
+  }
+});
 addEventListener('keydown', e => {
   if(e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if(e.key === 's' || e.key === 'S') wantShot = true;
@@ -432,7 +445,13 @@ function randomize(){
     if(cuts.length && r() < 0.75) set('pat', pick(r, cuts));
   }
 
-  const liqName = pick(r, SHAPE_LIQUIDS[shapeName]);
+  // An empty glass is a deliberate rarity, so its odds are set here rather
+  // than left to fall out of how many drinks each shape happens to allow
+  // (which put it near 9%). Shapes that never take one are unaffected.
+  const EMPTY_ODDS = 0.05;
+  const pours = SHAPE_LIQUIDS[shapeName].filter(l => l !== 'empty');
+  const canBeEmpty = SHAPE_LIQUIDS[shapeName].includes('empty');
+  const liqName = (canBeEmpty && r() < EMPTY_ODDS) ? 'empty' : pick(r, pours);
   $('liquid').value = liqName;
   liquid = LIQUIDS[liqName];
   set('colaCol', liquid.hex);
@@ -489,6 +508,10 @@ function fillInfo(){
     `<div><span>pattern</span>${selText('pat')}</div>` +
     `<div><span>time of day</span>${selText('tod')}</div>`;
 }
+// same capture the S key uses — the frame has to be grabbed inside the
+// render loop, so this only raises the flag
+$('shotBtn').addEventListener('click', () => { wantShot = true; });
+
 $('infoBtn').addEventListener('click', () => {
   const open = infoPanel.style.display === 'block';
   if(!open) fillInfo();
@@ -1038,6 +1061,22 @@ function frame(){
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     });
+  }
+
+  // A gallery embedding this piece can ask it for a still (see snapReq
+  // below). Same constraint as the screenshot above — the pixels only exist
+  // here, inside the render task — so the reply is sent from this point,
+  // once the caustics have had time to accumulate.
+  if(snapReq && ++snapFrames >= SNAP_AFTER){
+    const req = snapReq; snapReq = null;
+    try {
+      parent.postMessage({
+        type: 'summer-glass-snapshot', id: req.id,
+        jpeg: canvas.toDataURL('image/jpeg', req.quality ?? 0.72),
+      }, '*');
+    } catch(e){
+      parent.postMessage({ type: 'summer-glass-snapshot', id: req.id, error: String(e) }, '*');
+    }
   }
 
   requestAnimationFrame(frame);

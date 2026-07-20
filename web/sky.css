@@ -1,0 +1,42 @@
+/* ---------------------------------------------------------------------
+   THE SKY — one of the series' own times of day, dealt on each visit and
+   shared by the pages. Painted on <html> so it covers the whole canvas
+   however tall the page gets, and kept light enough that dark text and
+   frosted panels stay readable (a true night would need its own palette).
+   Applied by sky.js.
+   --------------------------------------------------------------------- */
+html {
+  margin:0; min-height:100%;
+  background:#e7ded4 no-repeat fixed;
+  background-size:cover;
+}
+html.sky-dawn {
+  background-image:
+    radial-gradient(120% 80% at 22% 12%, rgba(255,236,214,.95), transparent 55%),
+    linear-gradient(170deg, #f7e6dd 0%, #eed8d2 45%, #d3d8e0 100%);
+}
+html.sky-morning {
+  background-image:
+    radial-gradient(110% 70% at 78% 10%, rgba(255,251,238,.9), transparent 55%),
+    linear-gradient(175deg, #eef3f3 0%, #e3ebe8 50%, #f3ecdf 100%);
+}
+html.sky-noon {
+  background-image:
+    radial-gradient(90% 60% at 50% 0%, rgba(255,255,250,.95), transparent 60%),
+    linear-gradient(180deg, #eff2f1 0%, #e4e9e6 55%, #dcdcd4 100%);
+}
+html.sky-afternoon {
+  background-image:
+    radial-gradient(120% 85% at 18% 18%, rgba(255,238,203,.95), transparent 58%),
+    linear-gradient(168deg, #f8ecd7 0%, #f2dcbc 48%, #e6c8a6 100%);
+}
+html.sky-sunset {
+  background-image:
+    radial-gradient(85% 60% at 24% 30%, rgba(255,226,178,.95), transparent 55%),
+    linear-gradient(165deg, #fadfc0 0%, #f4bb99 45%, #dd9a90 78%, #c98f92 100%);
+}
+html.sky-dusk {
+  background-image:
+    radial-gradient(110% 70% at 80% 22%, rgba(255,226,206,.7), transparent 55%),
+    linear-gradient(172deg, #e6dbe2 0%, #cfc9de 50%, #b3b6cf 100%);
+}

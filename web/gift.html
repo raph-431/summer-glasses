@@ -3,16 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Summer Glasses — give one</title>
+<title>Summer in a Glass — buy somebody a drink</title>
 <style>
-  html, body { margin:0; min-height:100%; background:#b9b6b3; }
+  /* the photo lives on <html>: a root background is painted across the whole
+     canvas, so it covers the viewport however short or tall the page is —
+     on <body> it would stop where the content stops */
+  html {
+    margin:0; min-height:100%;
+    background:
+      linear-gradient(rgba(246,242,236,.62), rgba(246,242,236,.30) 45%, rgba(246,242,236,.55)),
+      url("summer-glass.jpg") center/cover no-repeat fixed, #b9b6b3;
+  }
   body {
+    margin:0; min-height:100vh; box-sizing:border-box; background:transparent;
     font:14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     color:#3a3733; display:grid; place-items:start center; padding:48px 16px;
   }
+  @media (max-width:700px){
+    /* iOS ignores background-attachment:fixed; scroll it instead of jittering */
+    html { background-attachment:scroll, scroll; }
+  }
   main { max-width:520px; width:100%; }
-  h1 { font:italic 24px Georgia, serif; font-weight:normal; margin:0 0 4px; }
-  .sub { opacity:.65; margin-bottom:24px; }
+  h1 {
+    font:italic 26px Georgia, serif; font-weight:normal; margin:0 0 6px;
+    text-shadow:0 1px 12px rgba(255,247,235,.9);
+  }
+  .sub { opacity:.8; margin-bottom:24px; text-shadow:0 1px 10px rgba(255,247,235,.85); }
   .card {
     background:rgba(255,255,255,.55); backdrop-filter:blur(10px);
     -webkit-backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,.6);
@@ -31,77 +47,154 @@
     border-radius:10px; padding:12px 14px; word-break:break-all; user-select:all;
   }
   .warn { font-size:12.5px; opacity:.75; margin-top:10px; }
+  #netnote {
+    font-size:13px; line-height:1.55; padding:11px 14px; border-radius:10px;
+    background:rgba(255,244,224,.75); border:1px solid rgba(180,140,70,.35);
+  }
+  #netnote b { display:block; margin-bottom:2px; }
+  #netnote div { opacity:.78; }
+  #netnote.wrong { background:rgba(255,232,226,.9); border-color:rgba(160,60,45,.45); }
+  textarea#note {
+    width:100%; box-sizing:border-box; margin-top:6px; resize:vertical;
+    font:italic 14px/1.5 Georgia, "Times New Roman", serif;
+    padding:9px 11px; border-radius:9px; border:1px solid rgba(120,90,50,.35);
+    background:rgba(255,255,255,.75); color:#3a3733;
+  }
   label.ck { display:flex; gap:8px; align-items:flex-start; margin:14px 0; cursor:pointer; }
   .muted { opacity:.6; font-size:12.5px; }
   .err { color:#8c2f2f; }
-  #card-print { display:none; }
-  @media print {
-    body > main > * { display:none !important; }
-    #card-print {
-      display:block !important; border:1px solid #999; border-radius:12px;
-      padding:28px; max-width:420px; margin:40px auto; font-size:13px;
-    }
-    #card-print h2 { font:italic 20px Georgia, serif; font-weight:normal; margin:0 0 2px; }
+  #browse { position:fixed; right:18px; top:16px; z-index:5; }
+  #browse a {
+    display:inline-block; font:13.5px inherit; color:#3a3733; text-decoration:none;
+    padding:8px 14px; border-radius:10px;
+    background:rgba(255,255,255,.62); border:1px solid rgba(255,255,255,.7);
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    box-shadow:0 2px 10px rgba(60,50,40,.12);
   }
+  #browse a:hover { background:rgba(255,255,255,.85); }
+  @media (max-width:760px){
+    /* on a narrow screen a floating corner link would sit on the title */
+    #browse { position:static; margin:0 0 18px; text-align:center; }
+    body { padding-top:28px; }
+  }
+  #step-done a {
+    display:inline-block; font:14px inherit; padding:9px 18px; border-radius:9px;
+    border:1px solid rgba(120,90,50,.35); background:rgba(255,255,255,.7);
+    color:#3a3733; text-decoration:none;
+  }
+  #step-done a:hover { background:rgba(255,255,255,.9); }
+  @media print { html, body { background:#fff !important; } }
 </style>
 </head>
 <body>
-<main>
-  <h1>give a summer glass</h1>
-  <div class="sub">a glass of something cold on a sunlit table — dealt at the moment they open it. Not even you will know which one it is.</div>
+<div id="browse"><a href="index.html">view already poured drinks →</a></div>
 
-  <div class="card" id="step-wallet">
-    <div id="netline" class="muted">…</div>
-    <div style="margin-top:10px"><button id="connect" class="primary">connect wallet</button>
-    <span id="acct" class="muted"></span></div>
+<main>
+  <div class="card" id="recovered" style="display:none">
+    <b>you have a gift code waiting</b>
+    <p class="muted">You paid for this one but never marked it as saved. It is
+      still valid — here it is again.</p>
+    <div class="code" id="recoveredCode"></div>
+    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
+      <button id="recoveredCopy">copy redeem link</button>
+      <button id="recoveredForget">I have it — forget it</button>
+    </div>
   </div>
 
-  <div class="card" id="step-code" style="display:none">
-    <b>1 · the gift code</b>
-    <p class="muted">Generated here in your browser — it never leaves this page. Whoever holds this code owns the gift, like a gift card: save it before paying, share it only with the person it's for.</p>
-    <div class="code" id="code">…</div>
-    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
-      <button id="copyCode">copy code</button>
-      <button id="copyLink">copy redeem link</button>
-      <button id="printCard">print gift card</button>
+  <h1>buy somebody a drink</h1>
+  <div class="sub"><br>A cold glass on a sunlit table, in the heat of summer, while cicadas sing all around.
+    <br> 
+    <br> The recipient does not need to have a wallet, it can be created in a second at the redeem step.<br>
+    <br>
+    Or <b>buy yourself a drink</b>: you deserve it!</div>
+
+  <div class="card" id="step-wallet">
+    <div id="netnote">
+      <b>this runs on the <span class="netname">…</span> network</b>
+      <div>Your wallet needs to be on it to buy a drink. When you connect we
+        will offer to switch — and to add the network if your wallet does not
+        know it yet.</div>
     </div>
-    <label class="ck"><input type="checkbox" id="saved"> <span>I've saved the code somewhere safe. If it's lost before payment I can regenerate; after payment a lost code locks the gift for a year (then I can reclaim it).</span></label>
+    <div style="margin-top:12px"><button id="connect" class="primary">connect wallet</button></div>
+    <div id="acct" class="muted" style="margin-top:8px"></div>
+    <div id="netline" class="muted" style="margin-top:10px">…</div>
   </div>
 
   <div class="card" id="step-pay" style="display:none">
-    <b>2 · prepay the gift</b>
+    <b>1 · prepay the gift</b>
     <p class="muted" id="priceline">…</p>
-    <button id="pay" class="primary" disabled>pay &amp; create gift</button>
+    <button id="pay" class="primary">pay &amp; create gift</button>
     <div id="paymsg" class="warn"></div>
   </div>
 
-  <div class="card" id="step-done" style="display:none">
-    <b>the gift is live 🥂</b>
-    <p class="muted">Hand over the code (or the link, or the printed card). When they redeem, a glass is poured for them on-chain — gas is already covered, they don't need anything but the code.</p>
-    <div class="muted" id="txline"></div>
+  <div class="card" id="step-code" style="display:none">
+    <b>2 · the gift code</b>
+    <p class="muted">This is the gift. Whoever holds it can pour the glass, like a
+      gift card — so keep it safe until you hand it over. It was made in your
+      browser and never sent anywhere. Copy the link or download the card and
+      this page stops holding on to it.</p>
+    <div class="code" id="code">…</div>
+    <label for="note" class="muted" style="display:block; margin-top:14px">
+      a message for them, if you like — it is drawn on the gift card
+      (<span id="noteLeft">160</span> left)
+    </label>
+    <textarea id="note" maxlength="160" rows="2" placeholder="cheers!"></textarea>
+    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
+      <button id="copyLink">copy redeem link</button>
+      <button id="downloadCard">download gift card</button>
+    </div>
   </div>
 
-  <div id="card-print">
-    <h2>a summer glass, for you</h2>
-    <div class="muted" style="margin-bottom:14px">one glass of something cold, on a sunlit table, held on-chain until you pour it</div>
-    <div class="code" id="printCode"></div>
-    <p>redeem it at:<br><span id="printUrl" style="font-family:ui-monospace,Menlo,monospace; font-size:12px"></span></p>
-    <div class="muted">no wallet or fees needed — the code is the key.</div>
+  <div class="card" id="step-done" style="display:none">
+    <b>3 · hand it over 🥂</b>
+    <p class="muted">Hand over the code (or the link, or the printed card). When they redeem, a glass is poured for them on-chain — gas is already covered, they don't need anything but the code.</p>
+    <div style="margin:14px 0 4px; display:flex; gap:8px; flex-wrap:wrap">
+      <button id="again" class="primary">buy another drink</button>
+      <a href="index.html">view already poured drinks</a>
+    </div>
+    <div class="muted" id="txline" style="margin-top:8px"></div>
   </div>
+
 </main>
 
 <script src="vendor/sha3.js"></script>
 <script type="module">
 import CONFIG from './config.js';
-import { newClaimKey, addressOf, encodeCode, bytesToHex } from './lib/claim.js';
+import { newCode, keyFromCode, addressOf } from './lib/claim.js';
 import { ethCall, selector, padAddress, fromWei } from './lib/rpc.js';
 
 const $ = id => document.getElementById(id);
 const show = id => { $(id).style.display = 'block'; };
 
-let account = null, priv = null, claimAddr = null, total = 0n;
+let account = null, priv = null, claimAddr = null, total = 0n, pendingCode = null;
 
-$('netline').textContent = `network: ${CONFIG.chainName} · contract ${CONFIG.contract.slice(0,10)}…`;
+document.querySelectorAll('.netname').forEach(el => { el.textContent = CONFIG.chainName; });
+$('netline').textContent = `contract ${CONFIG.contract.slice(0, 10)}…${CONFIG.contract.slice(-4)}`;
+
+/// Is the wallet currently on the right chain? Asked again before paying,
+/// because someone can switch networks between connecting and spending —
+/// and a payment on the wrong chain goes somewhere that isn't this contract.
+async function onRightChain(){
+  if(!window.ethereum) return false;
+  const chain = await window.ethereum.request({ method: 'eth_chainId' });
+  return parseInt(chain) === CONFIG.chainId;
+}
+
+function markNetwork(ok){
+  $('netnote').classList.toggle('wrong', !ok);
+  $('netnote').querySelector('b').textContent = ok
+    ? `connected to ${CONFIG.chainName}`
+    : `switch your wallet to ${CONFIG.chainName}`;
+}
+
+// wallets fire this when the user changes network in the extension
+window.ethereum?.on?.('chainChanged', async () => {
+  if(!account) return;
+  const ok = await onRightChain();
+  markNetwork(ok);
+  $('pay').disabled = !ok;
+  $('paymsg').textContent = ok ? '' : `you are on another network — switch back to ${CONFIG.chainName} to pay`;
+});
 
 async function readPrice(){
   const price = BigInt(await ethCall(CONFIG.rpc, CONFIG.contract, selector('price()')));
@@ -111,49 +204,302 @@ async function readPrice(){
     `${fromWei(total)} ETH — the piece (${fromWei(price)}) plus the recipient's gas, prepaid (${fromWei(stipend)}).`;
 }
 
-function prepareCode(){
-  priv = newClaimKey();
+// The claim address has to exist before gift() can be called, so the code is
+// always made before paying — it just is not shown until the money is in.
+// That leaves a gap: pay, then lose the tab, and the code is gone with the
+// gift locked until reclaim. So it is kept here from the moment it is made,
+// and only dropped once the gifter says they have written it down.
+const PENDING = 'summer-glasses/pending-gift';
+
+function rememberCode(code, claimAddr, paid){
+  try {
+    localStorage.setItem(PENDING, JSON.stringify({
+      code, claimAddr, paid, contract: CONFIG.contract, chainId: CONFIG.chainId,
+    }));
+  } catch {}
+}
+const forgetCode = () => { try { localStorage.removeItem(PENDING); } catch {} };
+
+function showRecovered(){
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(PENDING) || 'null'); } catch { return; }
+  // only worth raising if it was actually paid for, on this deployment
+  if(!saved || !saved.paid || saved.contract !== CONFIG.contract) return;
+  $('recoveredCode').textContent = saved.code;
+  $('recovered').style.display = 'block';
+  const link = new URL('redeem.html#k=' + saved.code.replace(/ /g, '-'), location.href).href;
+  $('recoveredCopy').onclick = () => {
+    navigator.clipboard.writeText(link);
+    $('recoveredCopy').textContent = 'copied ✓';
+  };
+  $('recoveredForget').onclick = () => { forgetCode(); $('recovered').style.display = 'none'; };
+}
+showRecovered();
+
+async function prepareCode(){
+  $('code').textContent = 'making a code…';
+  const code = newCode();
+  priv = await keyFromCode(code);              // slow by design (~0.2s)
   claimAddr = addressOf(priv);
-  const code = encodeCode(priv);
-  const link = new URL('redeem.html#k=' + code, location.href).href;
+  // hyphens rather than %20 for the spaces: the link is printed on a card and
+  // read by people, and the code parser treats any punctuation as a separator
+  const link = new URL('redeem.html#k=' + code.replace(/ /g, '-'), location.href).href;
   $('code').textContent = code;
-  $('printCode').textContent = code;
-  $('printUrl').textContent = link;
-  $('copyCode').onclick = () => navigator.clipboard.writeText(code);
-  $('copyLink').onclick = () => navigator.clipboard.writeText(link);
-  $('printCard').onclick = () => window.print();
+  $('code').style.letterSpacing = '0';
+  pendingCode = code;
+  rememberCode(code, claimAddr, false);
+  $('copyLink').onclick = () => {
+    navigator.clipboard.writeText(link);
+    $('copyLink').textContent = 'copied ✓';
+    forgetCode();                    // it is out of the browser and in their hands
+    setTimeout(() => { $('copyLink').textContent = 'copy redeem link'; }, 2000);
+  };
+  $('downloadCard').onclick = () => downloadCard(code, link, $('note').value.trim());
 }
 
-$('saved').addEventListener('change', e => { $('pay').disabled = !e.target.checked || !account; });
+/// A gift card as an image — easier to send, print or hand over than a link
+/// in a chat window. Drawn here rather than assembled from a template so it
+/// needs no server and no libraries.
+async function downloadCard(code, link, note){
+  const btn = $('downloadCard');
+  btn.textContent = 'drawing…';
+  try {
+    const W = 1400, H = 900;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+
+    // the photograph, cover-fitted, warmed down so text sits on top of it
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i); i.onerror = rej;
+      i.src = 'summer-glass.jpg';
+    });
+    const scale = Math.max(W / img.width, H / img.height);
+    const dw = img.width * scale, dh = img.height * scale;
+    g.drawImage(img, (W - dw)/2, (H - dh)/2, dw, dh);
+    const veil = g.createLinearGradient(0, 0, 0, H);
+    veil.addColorStop(0, 'rgba(250,246,240,.86)');
+    veil.addColorStop(0.55, 'rgba(250,246,240,.55)');
+    veil.addColorStop(1, 'rgba(250,246,240,.88)');
+    g.fillStyle = veil; g.fillRect(0, 0, W, H);
+
+    g.textAlign = 'center';
+    g.fillStyle = '#3a3733';
+    g.font = 'italic 62px Georgia, "Times New Roman", serif';
+    g.fillText('summer in a glass, for you', W/2, 150);
+
+    g.fillStyle = 'rgba(58,55,51,.72)';
+    g.font = '27px -apple-system, "Helvetica Neue", Arial, sans-serif';
+    g.fillText('a cold glass, on a sunlit table,', W/2, 205);
+    g.fillText('held on the blockchain until you pour it', W/2, 243);
+
+    // the handwritten part, in the open space above the code
+    if(note){
+      const size = note.length > 90 ? 34 : 40;
+      g.font = `italic ${size}px Georgia, "Times New Roman", serif`;
+      const lines = wrapLines(g, note, W - 380);
+      const lead = size * 1.45;
+      const top = 430 - (lines.length - 1) * lead / 2;
+      // a soft wash behind it, so it reads over the bright sun and the glass
+      const boxH = lines.length * lead + 40;
+      const wash = g.createLinearGradient(0, top - boxH/2 - lead, 0, top + boxH/2 + lead);
+      wash.addColorStop(0, 'rgba(252,249,244,0)');
+      wash.addColorStop(0.5, 'rgba(252,249,244,.78)');
+      wash.addColorStop(1, 'rgba(252,249,244,0)');
+      g.fillStyle = wash;
+      g.fillRect(110, top - boxH/2 - lead, W - 220, boxH + lead*2);
+      g.fillStyle = '#3a3733';
+      g.font = `italic ${size}px Georgia, "Times New Roman", serif`;
+      lines.forEach((ln, i) => g.fillText(ln, W/2, top + i * lead));
+    }
+
+    // the code, boxed so it reads as the thing to keep
+    g.fillStyle = 'rgba(255,255,255,.72)';
+    roundRect(g, W/2 - 560, 620, 1120, 116, 18); g.fill();
+    g.strokeStyle = 'rgba(120,90,50,.45)'; g.setLineDash([9, 7]); g.lineWidth = 2;
+    roundRect(g, W/2 - 560, 620, 1120, 116, 18); g.stroke(); g.setLineDash([]);
+
+    g.fillStyle = 'rgba(58,55,51,.6)';
+    g.font = '22px -apple-system, "Helvetica Neue", Arial, sans-serif';
+    g.fillText('your gift code', W/2, 600);
+
+    g.fillStyle = '#3a3733';
+    g.font = 'bold 40px ui-monospace, Menlo, "Courier New", monospace';
+    fitText(g, code, W - 180, 40, 'bold', 'ui-monospace, Menlo, "Courier New", monospace');
+    g.fillText(code, W/2, 696);
+
+    g.fillStyle = 'rgba(58,55,51,.72)';
+    g.font = '24px -apple-system, "Helvetica Neue", Arial, sans-serif';
+    g.fillText('redeem it at', W/2, 788);
+    // Phones run OCR over photos (Live Text / Lens) and turn a URL they can
+    // read into a tappable link — so this line is an interface, not decoration.
+    // Bigger and near-black to give the recogniser the best possible chance.
+    g.fillStyle = '#2c2925';
+    g.font = '26px ui-monospace, Menlo, "Courier New", monospace';
+    fitText(g, link, W - 140, 26, '', 'ui-monospace, Menlo, "Courier New", monospace');
+    g.fillText(link, W/2, 828);
+
+    g.fillStyle = 'rgba(58,55,51,.55)';
+    g.font = '21px -apple-system, "Helvetica Neue", Arial, sans-serif';
+    g.fillText('no wallet and no fees needed — the code is the key', W/2, 868);
+
+    // JPEG: a fraction of PNG's size to send around, and the card is a
+    // photograph anyway. Quality stays high (0.94) because phones OCR this
+    // card to make the link tappable, and compression artefacts around small
+    // glyphs are exactly what breaks that.
+    const a = document.createElement('a');
+    a.href = cv.toDataURL('image/jpeg', 0.94);
+    a.download = 'summer-glass-gift-card.jpg';
+    a.click();
+    forgetCode();                    // saved to disk; no need to keep it here
+    btn.textContent = 'downloaded ✓';
+  } catch(e){
+    btn.textContent = 'could not draw the card';
+    console.error(e);
+  }
+  setTimeout(() => { btn.textContent = 'download gift card'; }, 2500);
+}
+
+/// break a message into lines that fit, keeping whole words together
+function wrapLines(g, text, maxWidth){
+  const lines = [];
+  for(const para of text.split(/\n+/)){
+    let line = '';
+    for(const word of para.split(/\s+/).filter(Boolean)){
+      const next = line ? line + ' ' + word : word;
+      if(g.measureText(next).width > maxWidth && line){ lines.push(line); line = word; }
+      else line = next;
+    }
+    if(line) lines.push(line);
+  }
+  return lines.slice(0, 4);            // the card has room for four lines
+}
+
+function roundRect(g, x, y, w, h, r){
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+
+/// shrink the font until the line fits — codes and URLs vary in length
+function fitText(g, text, maxWidth, size, weight, family){
+  let s = size;
+  while(s > 10){
+    g.font = `${weight} ${s}px ${family}`.trim();
+    if(g.measureText(text).width <= maxWidth) return;
+    s -= 1;
+  }
+}
+
+/// Bring something into view and make sure it got there. Smooth scrolling is
+/// animated, and can be skipped entirely (reduced-motion settings, background
+/// tabs) — so check afterwards and snap if it didn't happen.
+function reveal(el){
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => {
+    const r = el.getBoundingClientRect();
+    if(r.top < 0 || r.bottom > innerHeight) el.scrollIntoView({ block: 'center' });
+  }, 700);
+}
+
+$('note').addEventListener('input', e => {
+  $('noteLeft').textContent = 160 - e.target.value.length;
+});
 
 $('connect').addEventListener('click', async () => {
   if(!window.ethereum){ $('acct').textContent = ' no wallet found in this browser'; return; }
-  const [acct] = await window.ethereum.request({ method: 'eth_requestAccounts' });
+  let acct;
+  try {
+    [acct] = await window.ethereum.request({ method: 'eth_requestAccounts' });
+  } catch(e){
+    $('acct').textContent = e.code === 4001
+      ? ' connection cancelled — press again when ready'
+      : ' could not connect: ' + (e.message || e);
+    return;
+  }
+
   const chain = await window.ethereum.request({ method: 'eth_chainId' });
   if(parseInt(chain) !== CONFIG.chainId){
+    const hexChain = '0x' + CONFIG.chainId.toString(16);
     try {
       await window.ethereum.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x' + CONFIG.chainId.toString(16) }],
+        params: [{ chainId: hexChain }],
       });
-    } catch {
-      $('acct').textContent = ` wrong network — please switch to ${CONFIG.chainName}`;
-      return;
+    } catch(e){
+      // 4902: the wallet has never heard of this chain. Offer to add it —
+      // Base Sepolia in particular is not preloaded in most wallets, and
+      // without this the whole flow dead-ends here.
+      const unknown = e.code === 4902 || e.code === -32603 || /unrecognized|unknown/i.test(e.message || '');
+      if(!unknown){
+        $('acct').textContent = e.code === 4001
+          ? ` please switch to ${CONFIG.chainName} to continue`
+          : ` could not switch network: ${e.message || e}`;
+        return;
+      }
+      try {
+        $('acct').textContent = ` adding ${CONFIG.chainName} to your wallet…`;
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: hexChain,
+            chainName: CONFIG.chainName,
+            rpcUrls: [CONFIG.rpc],
+            nativeCurrency: CONFIG.currency || { name: 'Ether', symbol: 'ETH', decimals: 18 },
+            ...(CONFIG.explorer ? { blockExplorerUrls: [CONFIG.explorer] } : {}),
+          }],
+        });
+      } catch(add){
+        $('acct').textContent = add.code === 4001
+          ? ` add ${CONFIG.chainName} in your wallet to continue`
+          : ` could not add ${CONFIG.chainName}: ${add.message || add}`;
+        return;
+      }
     }
   }
   account = acct;
+  markNetwork(true);
   $('acct').textContent = ' ' + acct.slice(0, 8) + '…' + acct.slice(-6);
   $('connect').textContent = 'connected';
   $('connect').disabled = true;
-  show('step-code'); show('step-pay');
-  prepareCode();
+  show('step-pay');
+  prepareCode().catch(e => {
+    $('paymsg').textContent = 'could not prepare a gift code: ' + e.message;
+    $('pay').disabled = true;
+  });
   readPrice().catch(e => { $('priceline').textContent = 'could not read price: ' + e.message; $('priceline').className = 'err'; });
+});
+
+$('again').addEventListener('click', () => {
+  // a new gift is a new key: reset the flow rather than reusing the code
+  // that was just handed over
+  $('step-done').style.display = 'none';
+  $('step-code').style.display = 'none';
+  $('pay').textContent = 'pay & create gift';
+  $('pay').disabled = true;
+  $('pay').textContent = 'pay & create gift';
+  $('paymsg').textContent = '';
+  $('copyLink').textContent = 'copy redeem link';
+  $('downloadCard').textContent = 'download gift card';
+  $('note').value = '';
+  $('noteLeft').textContent = '160';
+  prepareCode().catch(() => {});
+  reveal($('step-code'));
 });
 
 $('pay').addEventListener('click', async () => {
   $('pay').disabled = true;
   $('paymsg').textContent = 'confirm in your wallet…';
   try {
+    if(!await onRightChain()){
+      markNetwork(false);
+      throw new Error(`your wallet is on another network — switch to ${CONFIG.chainName} and try again`);
+    }
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
       params: [{
@@ -164,6 +510,7 @@ $('pay').addEventListener('click', async () => {
       }],
     });
     $('paymsg').textContent = 'waiting for confirmation…';
+    reveal($('paymsg'));
     for(;;){
       const r = await window.ethereum.request({ method: 'eth_getTransactionReceipt', params: [txHash] });
       if(r){
@@ -173,9 +520,14 @@ $('pay').addEventListener('click', async () => {
       await new Promise(s => setTimeout(s, 1500));
     }
     $('paymsg').textContent = '';
+    rememberCode(pendingCode, claimAddr, true);      // paid: now worth recovering
     $('txline').textContent = 'tx ' + txHash + (CONFIG.explorerTx ? '' : '');
     if(CONFIG.explorerTx) $('txline').innerHTML = `<a href="${CONFIG.explorerTx}${txHash}">view transaction</a>`;
+    $('pay').textContent = 'paid ✓';
+    show('step-code');
     show('step-done');
+    // the code is the thing they need to see, and it lands below the fold
+    reveal($('step-code'));
   } catch(e){
     $('paymsg').textContent = 'payment failed: ' + (e.message || e);
     $('pay').disabled = false;
