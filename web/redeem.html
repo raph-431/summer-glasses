@@ -76,7 +76,7 @@
   /* what is left once the message steps aside — nothing important should
      vanish on a timer, least of all the link we just told them to keep */
   #chip {
-    position:fixed; right:18px; top:16px; z-index:12; display:none;
+    position:fixed; left:18px; top:16px; z-index:12; display:none;
     align-items:center; gap:10px; padding:7px 12px; border-radius:10px;
     font:13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     color:rgba(255,255,255,.85); background:rgba(0,0,0,.3);
@@ -119,12 +119,12 @@
 
   <div class="card" id="step-to" style="display:none">
     <b>2 · where should it live?</b>
-    <p class="muted">An Ethereum address you own. No wallet? Create a fresh one right here.</p>
+    <p class="muted">An Ethereum Base address you own.</p>
     <input type="text" id="toIn" placeholder="0x…" autocomplete="off" spellcheck="false">
-    <div style="margin-top:10px"><button id="fresh">create a fresh wallet for me</button></div>
+    <p class="muted" style="margin-top:12px">No crypto wallet?</p>
+    <div style="margin-top:4px"><button id="fresh">create a fresh wallet for me</button></div>
     <div id="freshBox" style="display:none">
-      <div class="muted" style="margin-top:10px">Your new wallet. The <b>private key below is the only key</b> to your artwork — save it before continuing (password manager, printed, anywhere safe).</div>
-      <div class="code" id="freshAddr"></div>
+      <div class="muted" style="margin-top:10px">Your new wallet is ready — its address is filled in above. This <b>private key is the only key</b> to it: save it before continuing (password manager, printed, anywhere safe).</div>
       <div class="code" id="freshKey"></div>
       <button id="downloadKey">download key file</button>
       <label class="ck"><input type="checkbox" id="freshSaved"> <span>I saved the private key.</span></label>
@@ -217,9 +217,8 @@ $('fresh').addEventListener('click', () => {
   const addr = addressOf(key);
   freshWallet = true;
   $('freshBox').style.display = 'block';
-  $('freshAddr').textContent = addr;
   $('freshKey').textContent = bytesToHex(key);
-  $('toIn').value = addr;
+  $('toIn').value = addr;              // the address the token mints to
   $('downloadKey').onclick = () => {
     const blob = new Blob([
       `summer glasses — wallet\naddress: ${addr}\nprivate key: ${bytesToHex(key)}\n` +
