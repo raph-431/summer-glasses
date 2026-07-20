@@ -1,0 +1,8 @@
+{
+  "name": "summer-in-a-glass-web",
+  "private": true,
+  "description": "Static pages + the redeem serverless function. No \"type\":\"module\" on purpose — it would break the test harnesses' require() of the UMD sha3 vendor.",
+  "dependencies": {
+    "viem": "^2.55.4"
+  }
+}

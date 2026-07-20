@@ -20,7 +20,7 @@ export const baseSepolia = {
   explorer: 'https://sepolia.basescan.org',
   currency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   contract: '0xd44395a4832fdb631b3fd3ecb39e94b7da022e07',
-  relayer: 'http://127.0.0.1:8788',   // local for the rehearsal; hosted URL for a public testnet
+  relayer: '/api',   // Vercel serverless function on the same domain (web/api/redeem.mjs)
   explorerTx: 'https://sepolia.basescan.org/tx/',
 };
 
@@ -31,7 +31,7 @@ export const base = {
   explorer: 'https://basescan.org',
   currency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   contract: '0x_DEPLOYED_CONTRACT_HERE',
-  relayer: 'https://your-relayer.example/…',
+  relayer: '/api',   // Vercel serverless function on the same domain
   explorerTx: 'https://basescan.org/tx/',
 };
 

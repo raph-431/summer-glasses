@@ -29,3 +29,8 @@ relayer-pw.txt
 # VS Code Local History extension
 .history/
 summer-glass-*.jpg
+
+# web dependencies (viem for the serverless relayer; reinstall with npm install)
+web/node_modules/
+web/package-lock.json
+web/.test-key

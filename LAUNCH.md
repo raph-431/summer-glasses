@@ -43,18 +43,30 @@ forge script script/Deploy.s.sol --rpc-url https://sepolia.base.org \
 Then wire the pieces:
 
 1. `web/config.js`: fill `baseSepolia.contract`, switch `export default baseSepolia`.
-2. Relayer (any machine with foundry installed — a $5 VPS is plenty):
+2. **Relayer — deploy `web/` to Vercel** (the recommended path). The pages and
+   the redeem function ship together; there is no separate server to run or
+   babysit. `web/config.js` already points `relayer: '/api'` (same domain).
    ```sh
-   CONTRACT=0x… RELAYER_ACCOUNT=relayer-sepolia RELAYER_PASSWORD='…' \
-   RPC_URL=https://sepolia.base.org PORT=8788 node relayer/relayer.js
+   cd web
+   vercel                       # first deploy (or connect the git repo in the dashboard)
+   # set the function's secrets (Project → Settings → Environment Variables):
+   #   RELAYER_PK   0x…   the relayer wallet's private key (holds only a gas float)
+   #   CONTRACT     0x…   the deployed contract
+   #   RPC_URL      https://sepolia.base.org   (or mainnet)
+   #   CHAIN_ID     84532                       (8453 for mainnet)
+   vercel --prod
    ```
-   A keystore account **must** be given its password (`RELAYER_PASSWORD`, or
-   `RELAYER_PASSWORD_FILE` for a path). Without one, `cast` opens `/dev/tty`
-   and waits for a prompt nobody is watching — redeems then hang silently.
-   Note `CAST_PASSWORD` is *not* honoured; the relayer writes the password to
-   a 0600 temp file and passes `--password-file` so it never shows in `ps`.
-   Put it behind HTTPS (caddy/nginx) and set `baseSepolia.relayer` to that URL.
-3. Serve `web/` from any static host (the pages are plain files).
+   The function is `web/api/redeem.mjs` (viem, no Foundry). `RELAYER_PK` is
+   stored encrypted by Vercel; the wallet only ever holds the gas float it
+   earns back via the stipend. Verify with `curl https://yourdomain/api/status`.
+   - *Local preview:* `cd web && vercel dev` runs the pages **and** the function
+     together (`serve.js` alone serves only static files, so `/api` would 404).
+   - *Alternative (self-hosted):* the older `relayer/relayer.js` still works on a
+     box with Foundry — needs `RELAYER_ACCOUNT` + `RELAYER_PASSWORD` (or
+     `RELAYER_PASSWORD_FILE`); without a password `cast` blocks on a `/dev/tty`
+     prompt and redeems hang. Put it behind HTTPS and set `relayer` to that URL.
+3. If not using Vercel for the site, serve `web/` from any static host — but then
+   the relayer needs its own home (the self-hosted path above).
 
 **Rehearse the real thing:** gift from a wallet on `gift.html` → open the
 redeem link in a private window → fresh-wallet redeem → the reveal should
