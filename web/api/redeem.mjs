@@ -1,9 +1,10 @@
 // POST /api/redeem  {claimAddr, to, sig}  ->  {txHash, tokenId, seed}
 //
 // Vercel serverless function. Submits a redeem on the recipient's behalf so
-// they never need ETH; the gifter's prepaid stipend reimburses the gas. See
-// _relayer.mjs for the shared viem logic.
-import { relayer, doRedeem, cors, send, validate } from './_relayer.mjs';
+// they never need ETH; the gifter's prepaid stipend reimburses the gas. The
+// shared viem logic lives in ../lib/relayer-core.mjs — kept OUT of api/ on
+// purpose, since Vercel turns every file in api/ into its own function.
+import { relayer, doRedeem, cors, send, validate } from '../lib/relayer-core.mjs';
 
 export default async function handler(req, res){
   cors(res);

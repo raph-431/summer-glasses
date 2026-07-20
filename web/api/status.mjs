@@ -1,7 +1,7 @@
 // GET /api/status -> {contract, relayer, chainId}
 // A health check the redeem page hits before someone fills in an address, so
 // a misconfigured or down relayer is visible up front.
-import { relayer, cors, send } from './_relayer.mjs';
+import { relayer, cors, send } from '../lib/relayer-core.mjs';
 
 export default function handler(req, res){
   cors(res);
