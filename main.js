@@ -86,23 +86,43 @@ function resize(){
 }
 addEventListener('resize', resize); resize();
 
-// click-drag to orbit (drag deltas accumulate into the same smoothed target)
+// drag to orbit (drag deltas accumulate into the same smoothed target)
 let mouse = [0.5, 0.5], sm = [0.5, 0.5];
 let dragging = false, lastXY = [0, 0];
+const orbitTo = (x, y) => {
+  mouse[0] = Math.min(Math.max(mouse[0] - (x - lastXY[0])/innerWidth,  0), 1);
+  mouse[1] = Math.min(Math.max(mouse[1] - (y - lastXY[1])/innerHeight, 0), 1);
+  lastXY = [x, y];
+};
+const endDrag = () => { dragging = false; canvas.style.cursor = 'grab'; };
+
+// Mouse / pen via pointer events; touch is handled separately below so we can
+// preventDefault it — some mobile browsers ignore touch-action:none inside an
+// iframe and otherwise steal a one-finger drag for scrolling.
 addEventListener('pointerdown', e => {
+  if(e.pointerType === 'touch') return;
   if(e.target.closest('#ui')) return;         // panel clicks don't orbit
   dragging = true; lastXY = [e.clientX, e.clientY];
   canvas.style.cursor = 'grabbing';
 });
 addEventListener('pointermove', e => {
-  if(!dragging) return;
-  mouse[0] = Math.min(Math.max(mouse[0] - (e.clientX - lastXY[0])/innerWidth,  0), 1);
-  mouse[1] = Math.min(Math.max(mouse[1] - (e.clientY - lastXY[1])/innerHeight, 0), 1);
-  lastXY = [e.clientX, e.clientY];
+  if(dragging && e.pointerType !== 'touch') orbitTo(e.clientX, e.clientY);
 });
-const endDrag = () => { dragging = false; canvas.style.cursor = 'grab'; };
-addEventListener('pointerup', endDrag);
-addEventListener('pointercancel', endDrag);
+addEventListener('pointerup', e => { if(e.pointerType !== 'touch') endDrag(); });
+addEventListener('pointercancel', e => { if(e.pointerType !== 'touch') endDrag(); });
+
+// one-finger touch drag: preventDefault stops the page/iframe from scrolling
+addEventListener('touchstart', e => {
+  if(e.target.closest('#ui') || e.touches.length !== 1) return;
+  dragging = true; lastXY = [e.touches[0].clientX, e.touches[0].clientY];
+}, { passive: true });
+addEventListener('touchmove', e => {
+  if(!dragging || e.touches.length !== 1) return;
+  e.preventDefault();
+  orbitTo(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+addEventListener('touchend', endDrag);
+addEventListener('touchcancel', endDrag);
 
 // S saves the next frame as PNG. There is no reroll control: a viewer gets
 // exactly one deal per load. The #ui panel is never shown — it stays in the
