@@ -63,17 +63,18 @@ function revertReason(err){
   return r ? (r.reason ?? r.shortMessage ?? 'reverted') : null;
 }
 
+// Reverts that retrying can never fix — the redeem is genuinely wrong.
+// Everything else is treated as retryable, because the most common failure
+// is a node lagging behind the gift and reporting "unknown gift" — and Base's
+// public RPC sometimes strips the reason, so a stale gift can come back as a
+// bare "execution reverted". Retrying those is safe (a truly spent gift just
+// keeps reverting and turns terminal after the last attempt); NOT retrying
+// them fails a perfectly good redeem, which is worse.
+const PERMANENT = /bad signature|not the payer|zero claim|slot taken|art frozen/i;
+
 /// The whole redeem: simulate (free, gives a reason on failure), send, wait,
-/// read back the token id.
-///
-/// Classifying the failure is the subtle part. Most contract reverts are a
-/// final answer (bad signature, sold out) — retrying can't help, so they
-/// throw immediately with `.terminal`. The exception is "unknown gift": a
-/// public RPC pool is load-balanced, and a read can land on a node that
-/// hasn't yet seen the block carrying the gift, so a fresh gift can momentarily
-/// look spent. That one we retry through the backoff; only if it's STILL
-/// unknown after every attempt do we conclude the gift is genuinely gone.
-const MAX_ATTEMPTS = 5;
+/// read back the token id. See PERMANENT above for how failures are classified.
+const MAX_ATTEMPTS = 6;
 export async function doRedeem(r, claimAddr, to, sig){
   let lastErr;
   for(let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++){
@@ -98,18 +99,17 @@ export async function doRedeem(r, claimAddr, to, sig){
     } catch(err){
       lastErr = err;
       const reason = revertReason(err);
-      const unknownGift = reason && /unknown gift/i.test(reason);
 
-      // a real revert that isn't "unknown gift" can't be fixed by retrying
-      if(reason && !unknownGift){ const e = new Error(reason); e.terminal = true; throw e; }
+      // only a positively-recognised permanent reason ends it immediately
+      if(reason && PERMANENT.test(reason)){ const e = new Error(reason); e.terminal = true; throw e; }
 
       if(attempt === MAX_ATTEMPTS){
-        // out of retries: if it never stopped being "unknown gift", the gift
-        // really is spent (terminal 400); otherwise it was infrastructure (502)
-        if(unknownGift){ const e = new Error(reason); e.terminal = true; throw e; }
+        // out of retries: a revert this persistent is genuinely terminal — the
+        // gift is spent (report it as a clean 400); a non-revert was infra (502)
+        if(reason){ const e = new Error('unknown gift'); e.terminal = true; throw e; }
         throw lastErr;
       }
-      await sleep(attempt * 1500);   // ~1.5s, 3s, 4.5s, 6s — covers several Base blocks
+      await sleep(attempt * 1500);   // ~1.5s … 7.5s — covers several Base blocks
     }
   }
   throw lastErr;
