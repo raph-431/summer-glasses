@@ -27,10 +27,10 @@ function mkProg(vs, fs){
   if(!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
   return p;
 }
-function mkTarget(w, h){
+function mkTarget(w, h, fmt, type){
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+  gl.texImage2D(gl.TEXTURE_2D, 0, fmt || gl.RGBA16F, w, h, 0, gl.RGBA, type || gl.HALF_FLOAT, null);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -47,14 +47,39 @@ const blurProg   = mkProg(QUAD_VS, BLUR_FS);
 const compProg   = mkProg(QUAD_VS, COMP_FS);
 const brightProg = mkProg(QUAD_VS, BRIGHT_FS);
 const finalProg  = mkProg(QUAD_VS, FINAL_FS);
+const expoProg   = mkProg(QUAD_VS, EXPO_FS);
 
-const CAUST = 1024, BLUR = 512;
+const CAUST = 2048, BLUR = 512;
+// texel-density compensation: 4× the texels share the same photon count,
+// so the splat gain scales up to keep both modes' brightness (the finer
+// grid is what buys the light painting its filament sharpness)
+const CAUST_DENS = (CAUST/1024)*(CAUST/1024);
 // ping-pong pair: each frame decays the other into itself, then adds photons
 const caustPP = [mkTarget(CAUST, CAUST), mkTarget(CAUST, CAUST)];
 let caustFlip = 0;
 const CAUST_DECAY = 0.90;            // ~10-frame accumulation window
+
+// LIGHT PAINTING (branch experiment): the render stops pretending to be a
+// photograph — black void, and the accumulated caustic is the whole piece.
+// The slow decay is a long exposure (~330 frames — five-plus seconds of
+// memory) so the swaying light drags spectral trails; the gain is rescaled
+// to the same steady state.
+let lightPaint = true;               // L toggles live, for A/B against realism
+const PAINT_DECAY = 0.997;
+// auto-exposure servo: the ring's per-deal pose (offset/tilt) changes how
+// many photons survive to the floor, so a fixed gain leaves some deals
+// faint. Every 20 frames the accumulated pool's mean luminance is read back
+// tiny (16×16) and the gain steered toward a target — slowly, because the
+// buffer answers with a ~330-frame lag.
+// 48×48 probe: fine enough that a thin scorching annulus (the contact ring
+// at the glass base) still registers as a highlight instead of averaging
+// away, as it did at 16×16 once the rings stopped moving
+const EXPO = 48;
+const expoBuf = new Uint8Array(EXPO*EXPO*4);
+let expoGain = 1, expoN = 0;
 const blurA = mkTarget(BLUR, BLUR);
 const blurB = mkTarget(BLUR, BLUR);
+const expoT = mkTarget(EXPO, EXPO, gl.RGBA8, gl.UNSIGNED_BYTE);  // readback probe
 
 const GW = 512, GH = 288, NL = 3;
 const NPHOT = GW*GH*NL;
@@ -64,7 +89,8 @@ gl.bindVertexArray(vao);
 
 const U = p => new Proxy({}, { get: (_, n) => gl.getUniformLocation(p, n) });
 const uP = U(photonProg), uF = U(fadeProg), uB = U(blurProg),
-      uC = U(compProg), uBr = U(brightProg), uFin = U(finalProg);
+      uC = U(compProg), uBr = U(brightProg), uFin = U(finalProg),
+      uE = U(expoProg);
 
 // the Proxy lookup hides typos (null location = silent no-op), so verify the
 // profile uniforms actually exist in the composite program
@@ -86,12 +112,19 @@ function resize(){
 }
 addEventListener('resize', resize); resize();
 
-// drag to orbit (drag deltas accumulate into the same smoothed target)
+// drag to orbit (drag deltas accumulate into the same smoothed target).
+// Azimuth is UNclamped — keep dragging and you keep going around; one
+// screen-width of drag is one full turn. SHIFT+drag (or the wheel) zooms.
 let mouse = [0.5, 0.5], sm = [0.5, 0.5];
+let zoom = 1, zoomSm = 1;
 let dragging = false, lastXY = [0, 0];
-const orbitTo = (x, y) => {
-  mouse[0] = Math.min(Math.max(mouse[0] - (x - lastXY[0])/innerWidth,  0), 1);
-  mouse[1] = Math.min(Math.max(mouse[1] - (y - lastXY[1])/innerHeight, 0), 1);
+const orbitTo = (x, y, zoomDrag) => {
+  if(zoomDrag){
+    zoom = Math.min(Math.max(zoom*Math.exp((y - lastXY[1])/240), 0.45), 2.6);
+  } else {
+    mouse[0] -= (x - lastXY[0])/innerWidth;
+    mouse[1] = Math.min(Math.max(mouse[1] - (y - lastXY[1])/innerHeight, 0), 1);
+  }
   lastXY = [x, y];
 };
 const endDrag = () => { dragging = false; canvas.style.cursor = 'grab'; };
@@ -106,8 +139,12 @@ addEventListener('pointerdown', e => {
   canvas.style.cursor = 'grabbing';
 });
 addEventListener('pointermove', e => {
-  if(dragging && e.pointerType !== 'touch') orbitTo(e.clientX, e.clientY);
+  if(dragging && e.pointerType !== 'touch') orbitTo(e.clientX, e.clientY, e.shiftKey);
 });
+addEventListener('wheel', e => {
+  if(e.target.closest('#ui')) return;
+  zoom = Math.min(Math.max(zoom*Math.exp(e.deltaY*0.0012), 0.45), 2.6);
+}, { passive: true });
 addEventListener('pointerup', e => { if(e.pointerType !== 'touch') endDrag(); });
 addEventListener('pointercancel', e => { if(e.pointerType !== 'touch') endDrag(); });
 
@@ -144,6 +181,10 @@ addEventListener('message', e => {
 addEventListener('keydown', e => {
   if(e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if(e.key === 's' || e.key === 'S') wantShot = true;
+  if(e.key === 'l' || e.key === 'L'){
+    lightPaint = !lightPaint;
+    expoN = 0;   // restart the exposure servo's charge model with the buffer
+  }
 });
 
 const $ = id => document.getElementById(id);
@@ -423,6 +464,51 @@ let isCrystal = false;  // labels the info panel
 let spillSeed = 0;      // puddle outline        — rolled per deal in randomize()
 let canRot = 0;         // palm/pergola bearing  — ditto
 let tabRot = 0;         // wood plank direction  — ditto
+// light painting: THREE neon rings, one per light slot, each in its own
+// colour and its own pose — offset from the glass axis, tilted out of
+// level, its own radius. All rolled per deal; each precesses slowly.
+const ringOffA = [0, 0, 0], ringOffR = [0.3, 0.3, 0.3];   // offset bearing + distance (× maxR)
+const ringTiltA = [0, 0, 0], ringTilt = [0.15, 0.15, 0.15]; // tilt bearing + angle (rad)
+const ringRF = [1, 1, 1];                                 // per-ring radius jitter
+const ringHF = [1, 1, 1];  // height fraction: 0 = hanging low beside the bowl
+const ringArc = [0.4, 0.4, 0.4];  // emission arc: how much tube a wall point
+                                  // sees — the ring's optical softness
+// ONE colored hoop per deal now (slot 0 — the other slots' poses are rolled
+// but dormant); its colour comes from this neon palette
+const NEONS = [
+  [1.05, 0.12, 0.62],   // magenta
+  [0.10, 0.85, 1.05],   // cyan
+  [1.00, 0.62, 0.10],   // amber
+  [0.55, 1.00, 0.12],   // acid green
+  [1.05, 0.22, 0.15],   // red-orange
+  [0.55, 0.25, 1.10],   // violet
+  [0.35, 0.65, 1.10],   // ice blue
+  [1.05, 0.45, 0.75],   // pink
+];
+let ringCol = NEONS[0];
+// a bare distant sun over the void (slot 2): classical parallel-ray caustic
+// cutting across the hoop's mandala. Warm white; pose rolled per deal.
+let paintSunAz = 0.8, paintSunEl = 0.9;
+// splashed-metal skin over the glass (light painting): noise blotches of
+// opaque mirror — they block the caustic light and bounce it instead
+let metal = 0, metalSeed = 0, metalCol = [0.92, 0.94, 0.98];
+let metalScale = 3, metalWarp = 1;   // blotch size + how stringy they smear
+const METALS = [[0.92, 0.94, 0.98],   // silver
+                [1.00, 0.78, 0.38],   // gold
+                [0.98, 0.55, 0.38]];  // copper
+// the small WHITE ring inside the glass — free to tilt hard and to pierce
+// the wall; deliberately unphysical
+let wOffA = 0, wOffR = 0.2;   // centre offset bearing + distance (× maxR)
+let wTiltA = 0, wTilt = 0.3;  // tilt bearing + angle (rad)
+let wRF = 0.6, wHF = 0.5;     // radius (× maxR) and height fraction
+let wN = 8, wSpan = 3.0, wPh0 = 0;  // it's a STRING OF BULBS along an arc:
+                                    // count, span (rad), start phase
+const BULBS = true;   // back on — but as a single bulb (see the roll)
+const RING_R = [2.1, 2.6, 3.1];      // base radii (× maxR): nested hoops
+// (precession parked: everything holds still while we study the detail —
+// restore by adding a slow per-ring drift back onto ringTiltA in frame())
+const ringCArr = new Float32Array(9), ringUArr = new Float32Array(9),
+      ringVArr = new Float32Array(9);
 function randomize(){
   const r = mulberry32(seed = (seed*1664525 + 1013904223)|0);
   const set = (id, v) => { $(id).value = v; };
@@ -438,7 +524,10 @@ function randomize(){
     const d = shape.prof[i] - shape.prof[i-1];
     shape.prof[i] = shape.prof[i-1] + Math.min(Math.max(d, d0 - 0.05), d0 + 0.05);
   }
-  set('wall', (shape.wall*rng(r, 0.75, 1.35)).toFixed(3));
+  // EXPERIMENT: wall thickness thrown wide too — from near-lab-glass thin
+  // to half-solid slabs (thick walls are giant lenses: long glass chords,
+  // heavy refraction, the fattest caustic folds in the piece)
+  set('wall', (shape.wall*rng(r, 0.50, 2.20)).toFixed(3));
   set('irr', (r() < 0.25 ? rng(r, 1.0, 1.45) : rng(r, 0.2, 0.9)).toFixed(2));
   const hasBub = r() < 0.10;                 // seeded glass is the exception
   set('bub', (hasBub ? rng(r, 0.6, 1.0) : 0).toFixed(2));
@@ -446,10 +535,14 @@ function randomize(){
   $('rim').checked = r() < (RIM_ODDS[shapeName] ?? 0.08);
   set('glassCol', r() < 0.10 ? pick(r, SAT_TINTS) : pick(r, GLASS_TINTS));
 
-  set('pat', pick(r, SHAPE_PATTERNS[shapeName]));
-  set('facet', rng(r, 0.4, 1.8).toFixed(2));
-  set('diam', rng(r, 0.6, 2.0).toFixed(2));
-  set('diamN', Math.round(rng(r, 8, 30)));
+  // EXPERIMENT: any pattern on any shape — the curated SHAPE_PATTERNS
+  // pairing is parked with realism — and the pattern dials thrown wide:
+  // deeper cuts, giant-to-hairline repeat counts, squashed-to-stretched
+  // aspects. Extremes may flirt with raymarch artifacts; that's the deal.
+  set('pat', String(Math.floor(r()*7)));
+  set('facet', rng(r, 0.3, 2.4).toFixed(2));
+  set('diam', rng(r, 0.3, 3.0).toFixed(2));
+  set('diamN', Math.round(rng(r, 5, 48)));
   set('disp', rng(r, 0.1, 1.4).toFixed(2));
 
   // crystal: harder refraction, real fire, water-clear body, deep cuts —
@@ -460,9 +553,9 @@ function randomize(){
   if(crystal){
     set('glassCol', pick(r, ['#f6fbfa', '#f7f7fc', '#f4faf7']));
     set('disp', rng(r, 1.2, 1.9).toFixed(2));
-    set('facet', rng(r, 1.1, 1.9).toFixed(2));
-    const cuts = SHAPE_PATTERNS[shapeName].filter(p => p === '1' || p === '4');
-    if(cuts.length && r() < 0.75) set('pat', pick(r, cuts));
+    set('facet', rng(r, 1.1, 2.4).toFixed(2));
+    // (no pattern re-pick: in this experiment crystal keeps whatever
+    // pattern it rolled — only the optics say crystal)
   }
 
   // A brimful glass — a generous pour right up near the rim — is a deliberate
@@ -505,6 +598,55 @@ function randomize(){
   spillSeed = r();
   canRot = r()*6.2832;
   tabRot = r()*6.2832;
+  // neon ring poses (appended after the older rolls so existing seeds keep
+  // dealing the same glass): never perfectly centred, never perfectly flat
+  for(let i=0;i<3;i++){
+    ringRF[i] = rng(r, 0.88, 1.14);          // rolled first: it caps the offset
+    ringOffA[i] = r()*6.2832;
+    // centres pushed well off-axis — but a hoop that hangs low must never
+    // pass through the glass, so the reach scales with this ring's radius
+    ringOffR[i] = rng(r, 0.35, Math.min(1.4, RING_R[i]*ringRF[i] - 1.25));
+    ringTiltA[i] = r()*6.2832;
+    ringTilt[i] = rng(r, 0.08, 0.28);
+    ringHF[i] = Math.pow(r(), 1.5);          // height, biased toward LOW
+    // emission arc, log-uniform 0.08–0.9 rad: lace ↔ glow reads evenly
+    ringArc[i] = 0.08*Math.exp(r()*2.42);
+  }
+  // the lone hoop reclaims the radius range the three used to span; its
+  // reach cap must follow so a low hoop still clears the glass
+  ringRF[0] = rng(r, 0.90, 1.55);
+  ringOffR[0] = Math.min(ringOffR[0], RING_R[0]*ringRF[0] - 1.25);
+  ringCol = NEONS[Math.floor(r()*NEONS.length)];
+  paintSunAz = r()*6.2832;
+  paintSunEl = rng(r, 0.55, 1.15);     // 32°–66°: fan lands inside the window
+  // splashed metal: nearly every deal wears some
+  metal = r() < 0.95 ? rng(r, 0.15, 0.65) : 0;
+  metalSeed = r()*100;
+  metalCol = pick(r, METALS);
+  metalScale = 1.8*Math.exp(r()*1.5);  // log-uniform 1.8–8: islands..speckle
+  metalWarp = rng(r, 0.0, 2.2);        // 0 round blobs .. stringy splatter
+  // the white bulb circle: pushed well off-centre — often halfway out the
+  // wall — and slanted anywhere from a polite tip to a hard ~64° keel
+  // (pow-biased: usually moderate, sometimes steep)
+  // radius first — the offset scales with it. Log-uniform 0.30–1.60 × maxR:
+  // from a tight coronet deep in the bowl to a wide halo ringing the
+  // outside of the glass entirely
+  wRF = 0.30*Math.exp(r()*1.674);
+  wOffA = r()*6.2832;
+  // offset proportional to the circle's own radius so big halos actually
+  // READ as off-centre (an offset small relative to the radius still looks
+  // concentric no matter its absolute size)
+  wOffR = rng(r, 0.50, 1.10) * Math.max(wRF, 0.55);
+  wTiltA = r()*6.2832;
+  wTilt = 0.10 + 1.02*Math.pow(r(), 1.6);
+  wHF = rng(r, 0.30, 0.80);
+  // ONE white bulb: a lone point of light hanging somewhere on the rolled
+  // circle — all the string's photons pour into it, so its single caustic
+  // fan is the crispest light in the piece. (Restore 5 + floor(r()*8) for
+  // the full string.)
+  wN = 1;
+  wSpan = 6.2831853;
+  wPh0 = r()*6.2832;                         // where on the circle it hangs
   // machine-readable deal summary for marketplaces/indexers (same wording
   // as the info panel)
   window.$features = {
@@ -740,6 +882,7 @@ function frame(){
   }
   sm[0] += (mouse[0]-sm[0])*0.05;
   sm[1] += (mouse[1]-sm[1])*0.05;
+  zoomSm += (zoom - zoomSm)*0.08;
 
   const wind  = parseFloat($('wind').value);
   const facet = parseFloat($('facet').value);
@@ -748,14 +891,16 @@ function frame(){
   // thing on a shot glass and a highball
   const fillF = parseFloat($('liq').value);
   const cavY  = shape.y0 + shape.cavBase + wallv*1.3;
-  // an empty glass parks the surface just below the cavity floor
-  const liq   = liquid.empty ? cavY - 0.02
+  // an empty glass parks the surface just below the cavity floor.
+  // Light painting pours the drink out: the caustic is pure glass — no
+  // absorption, no ember — so the accumulated filaments stay spectral
+  const liq   = (liquid.empty || lightPaint) ? cavY - 0.02
               : cavY + fillF*(shape.H*shape.fillMax - cavY);
   const maxR  = Math.max(...shape.prof, shape.footR);
   const baseR = shape.y0 > 0 ? shape.footR : shape.prof[0];
 
   // ice rides the liquid surface; below a half pour there's no room for it
-  const iceN = (liquid.empty || fillF < 0.5) ? 0 : parseInt($('ice').value);
+  const iceN = (liquid.empty || lightPaint || fillF < 0.5) ? 0 : parseInt($('ice').value);
   if(iceN > 0){
     const rIn = Math.max(profR(liq) - wallv, 0.05);
     const shrink = iceN === 1 ? 1.0 : (iceN === 2 ? 0.85 : 0.75);
@@ -855,6 +1000,11 @@ function frame(){
     gl.uniform1f(u.u_canRot, canRot);
     gl.uniform1f(u.u_rim, $('rim').checked ? 1 : 0);
     gl.uniform3f(u.u_rimCol, 1.0, 0.78, 0.42);
+    gl.uniform1f(u.u_metal, metal);
+    gl.uniform1f(u.u_metalSeed, metalSeed);
+    gl.uniform3f(u.u_metalCol, ...metalCol);
+    gl.uniform1f(u.u_metalScale, metalScale);
+    gl.uniform1f(u.u_metalWarp, metalWarp);
   };
   const leaf  = parseFloat($('leaf').value);
   const sun   = parseFloat($('sun').value);
@@ -890,18 +1040,76 @@ function frame(){
       -tw*0.023 + 0.05*snz(tw*0.24, s.ph + 2.0) + 0.013*gust*snz(tw*1.7, s.ph*1.3));
   }
 
+  // NEON RING (light painting): replace the sun + foliage gaps with three
+  // tube thirds — the photon shader launches from the ring geometry itself;
+  // these dirs are only the stand-ins the ghost's glints reflect. The tube
+  // hums with a fast shallow flicker instead of the foliage breathing.
+  // ring poses: each hoop's centre is pushed off the glass axis and its
+  // plane tilted out of level about the horizontal axis perpendicular to
+  // its (slowly precessing) tilt bearing. e1 dips by the tilt, e2 stays
+  // level; the shader sweeps C + R(e1 cosφ + e2 sinφ). Each hoop's DIPPED
+  // side must stay high enough that its light still dives into the glass
+  // (≥ ~25° elevation): sectors lit flatter lose nearly every photon to
+  // grazing exits, which read as near-black mandalas.
+  for(let i=0;i<NL;i++){
+    const Ri = RING_R[i]*ringRF[i]*maxR;
+    const Ai = ringTiltA[i];              // still: no precession for now
+    const ctl = Math.cos(ringTilt[i]), stl = Math.sin(ringTilt[i]);
+    // height: rolled between hanging low beside the bowl and the old safe
+    // perch (the ≥25° formula). Low rings light the glass almost side-on —
+    // long grazing streaks and dark sectors; the servo carries exposure.
+    // Whatever the roll, the dipped side must still clear the table.
+    const highH = shape.H + Ri*stl + (Ri - maxR)*0.47;
+    const lowH = 0.60*shape.H;
+    const Hi = Math.max(lowH + (highH - lowH)*ringHF[i], 0.15 + Ri*stl);
+    const ca = Math.cos(Ai), sa = Math.sin(Ai);
+    ringUArr[i*3] = Ri*ca*ctl; ringUArr[i*3+1] = -Ri*stl; ringUArr[i*3+2] = Ri*sa*ctl;
+    ringVArr[i*3] = -Ri*sa;    ringVArr[i*3+1] = 0;       ringVArr[i*3+2] = Ri*ca;
+    ringCArr[i*3] = ringOffR[i]*maxR*Math.cos(ringOffA[i]);
+    ringCArr[i*3+1] = Hi;
+    ringCArr[i*3+2] = ringOffR[i]*maxR*Math.sin(ringOffA[i]);
+  }
+  // the white inner ring's basis: same construction, small and crooked,
+  // centred inside the cavity
+  const wRw = wRF*maxR;
+  const wct = Math.cos(wTilt), wst = Math.sin(wTilt);
+  const wca = Math.cos(wTiltA), wsa = Math.sin(wTiltA);
+  const wU = [wRw*wca*wct, -wRw*wst, wRw*wsa*wct];
+  const wV = [-wRw*wsa, 0, wRw*wca];
+  const wC = [wOffR*maxR*Math.cos(wOffA),
+              cavY + wHF*(0.95*shape.H - cavY),
+              wOffR*maxR*Math.sin(wOffA)];
+  if(lightPaint){
+    // stand-in direction: from the hoop's centre toward mid-glass. Slot 0
+    // carries the deal's colour; the other slots go dark.
+    const d = [ringCArr[0], ringCArr[1] - 0.5*shape.H, ringCArr[2]];
+    const n = -Math.hypot(...d);                      // FROM tube INTO scene
+    dirs[0] = d[0]/n; dirs[1] = d[1]/n; dirs[2] = d[2]/n;
+    cols[0] = ringCol[0]; cols[1] = ringCol[1]; cols[2] = ringCol[2];
+    for(let i=3;i<NL*3;i++) cols[i] = 0;
+    // slot 2: the distant sun (parallel rays — the photon shader's
+    // directional path), burning in the SAME neon colour as the hoop —
+    // one hue owns the whole deal, white stays the bulbs' alone
+    const ce = Math.cos(paintSunEl);
+    dirs[6] = -Math.cos(paintSunAz)*ce;
+    dirs[7] = -Math.sin(paintSunEl);
+    dirs[8] = -Math.sin(paintSunAz)*ce;
+    cols[6] = ringCol[0]; cols[7] = ringCol[1]; cols[8] = ringCol[2];
+  }
+
   // where the glass projects up the sun ray onto the canopy plane — palm
   // and parasol anchor to this so their shade lands on the glass
   const cupy = Math.max(-dirs[1], 0.2);
   const canopyC = [-dirs[0]*2.6/cupy, -dirs[2]*2.6/cupy];
 
   // caustic accumulation window: follows the main sun, so a low sun throws
-  // the window (and the caustic) far down-light of the glass
+  // the window (and the caustic) far down-light of the glass. The ring is
+  // symmetric — its window just sits centred under the glass.
   const chl = Math.hypot(dirs[0], dirs[2]);
   const ccot = chl/Math.max(-dirs[1], 0.08);
-  const cdist = Math.min(0.5*shape.H*ccot, 1.8);
-  const caustC = [dirs[0]/chl*cdist, dirs[2]/chl*cdist];
-  const caustS = Math.min(Math.max(0.9 + cdist, 1.7), 3.0);
+  const cdist = lightPaint ? 0 : Math.min(0.5*shape.H*ccot, 1.8);
+  const caustC = lightPaint ? [0, 0] : [dirs[0]/chl*cdist, dirs[2]/chl*cdist];
+  const caustS = lightPaint ? 2.2 : Math.min(Math.max(0.9 + cdist, 1.7), 3.0);
 
   // audio follows the weather and the hour: rustle rides the gusts, and the
   // cicada / cricket / bird mix crossfades with the time-of-day preset
@@ -923,7 +1131,7 @@ function frame(){
   gl.useProgram(fadeProg);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, caustPrev.tex);
   gl.uniform1i(uF.u_tex, 0);
-  gl.uniform1f(uF.u_decay, CAUST_DECAY);
+  gl.uniform1f(uF.u_decay, lightPaint ? PAINT_DECAY : CAUST_DECAY);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
   gl.useProgram(photonProg);
@@ -935,7 +1143,8 @@ function frame(){
   gl.uniform1f(uP.u_wall, wallv);
   setShared(uP);
   gl.uniform1f(uP.u_time, t);
-  gl.uniform1f(uP.u_soft, T.soft*(1.0 + 0.8*wind));
+  // paint mode: a crisp bare sun (tiny angular size, no leaf diffraction)
+  gl.uniform1f(uP.u_soft, lightPaint ? 0.015 : T.soft*(1.0 + 0.8*wind));
   // per-frame energy: steady state ≈ gain/(1-decay); smaller splats since
   // accumulation fills the gaps, so the folds stay filament-sharp.
   // Three exposure corrections keep the caustic visible in every deal:
@@ -968,14 +1177,67 @@ function frame(){
   const Ltab = (lumOf(ambMix) + dirLum*(1 - 0.62*leaf)*1.10)
              * (TAB_ALB[$('table').value] ?? 0.8);
   const brightComp = Math.min(Math.max(Ltab/0.65, 0.85), 2.2);
-  gl.uniform1f(uP.u_gain, 0.09 * windowComp * Math.min(boost*brightComp, 6.0));
+  // light painting: same steady-state energy under the slow decay, times a
+  // lift for the black void (no lit table to compete with — brightComp is
+  // moot, its anchor scene no longer exists)
+  const steadyFix = lightPaint ? (1 - PAINT_DECAY)/(1 - CAUST_DECAY) * 2.0 * expoGain : 1;
+  gl.uniform1f(uP.u_gain, 0.09 * CAUST_DENS * windowComp
+    * Math.min(boost*(lightPaint ? 1 : brightComp), 6.0) * steadyFix);
   gl.uniform1f(uP.u_seed, Math.random()*100.0);
-  gl.uniform1f(uP.u_disp, parseFloat($('disp').value));
+  // dispersion pushed harder in light painting: the trails should go spectral
+  gl.uniform1f(uP.u_disp, parseFloat($('disp').value) * (lightPaint ? 1.6 : 1));
+  gl.uniform1f(uP.u_arty, lightPaint ? 1 : 0);
+  gl.uniform3fv(uP.u_ringC, ringCArr);
+  gl.uniform3fv(uP.u_ringU, ringUArr);
+  gl.uniform3fv(uP.u_ringV, ringVArr);
+  gl.uniform3f(uP.u_ringWC, ...wC);
+  gl.uniform3f(uP.u_ringWU, ...wU);
+  gl.uniform3f(uP.u_ringWV, ...wV);
+  gl.uniform1fv(uP.u_ringArc, ringArc);
+  gl.uniform1f(uP.u_ringWN, BULBS ? wN : 0);
+  gl.uniform1f(uP.u_ringWSpan, wSpan);
+  gl.uniform1f(uP.u_ringWPh0, wPh0);
   gl.uniform1f(uP.u_mode, 0);            // transmitted photons
   gl.drawArrays(gl.POINTS, 0, NPHOT);
   gl.uniform1f(uP.u_mode, 1);            // Fresnel-reflected photons
   gl.drawArrays(gl.POINTS, 0, NPHOT);
+  if(lightPaint && BULBS){
+    gl.uniform1f(uP.u_mode, 2);          // the white bulb string's own pass
+    gl.drawArrays(gl.POINTS, 0, GW*GH);
+  }
   gl.disable(gl.BLEND);
+
+  // auto-exposure (light painting): project what the still-charging buffer
+  // will converge to, compare against the target mean, and nudge the gain.
+  // Gentle steps (^0.35, ±35% per measure) because the answer lags ~330
+  // frames behind the correction — hard servoing would oscillate.
+  if(lightPaint && expoN++ % 20 === 0){
+    gl.bindFramebuffer(gl.FRAMEBUFFER, expoT.fb);
+    gl.viewport(0, 0, EXPO, EXPO);
+    gl.useProgram(expoProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, caust.tex);
+    gl.uniform1i(uE.u_tex, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.readPixels(0, 0, EXPO, EXPO, gl.RGBA, gl.UNSIGNED_BYTE, expoBuf);
+    let sum = 0, mx = 0;
+    for(let i=0;i<expoBuf.length;i+=4){
+      sum += expoBuf[i];
+      if(expoBuf[i] > mx) mx = expoBuf[i];
+    }
+    const mean = (sum/(EXPO*EXPO))/255*4;               // undo the ÷4 packing
+    const peak = mx/255*4;
+    const charge = 1 - Math.pow(PAINT_DECAY, expoN);    // how full the buffer is
+    const projM = mean/Math.max(charge, 0.05);
+    const projP = peak/Math.max(charge, 0.05);
+    // expose FOR the mean, but never PAST the highlights: a compact pool
+    // (steep near-centred rings) has a dim mean around a scorching core,
+    // and mean-only metering burned those out. Static rings concentrate
+    // far more energy per texel than moving ones did, so the gain floor
+    // sits low — the servo must be free to pull hard under the old 1×.
+    const err = Math.min(0.055/Math.max(projM, 1e-4), 1.3/Math.max(projP, 1e-4));
+    const step = Math.pow(err, 0.35);
+    expoGain = Math.min(Math.max(expoGain*Math.min(Math.max(step, 1/1.5), 1.5), 0.15), 20.0);
+  }
 
   // ---- pass 2: blur for the soft halo
   gl.useProgram(blurProg);
@@ -1021,13 +1283,25 @@ function frame(){
   gl.uniform1f(uC.u_night, T.night ? 1 : 0);
   gl.uniform1f(uC.u_table, parseFloat($('table').value));
   gl.uniform1f(uC.u_tabRot, tabRot);
+  gl.uniform1f(uC.u_arty, lightPaint ? 1 : 0);
+  gl.uniform3fv(uC.u_ringC, ringCArr);
+  gl.uniform3fv(uC.u_ringU, ringUArr);
+  gl.uniform3fv(uC.u_ringV, ringVArr);
+  gl.uniform3f(uC.u_ringWC, ...wC);
+  gl.uniform3f(uC.u_ringWU, ...wU);
+  gl.uniform3f(uC.u_ringWV, ...wV);
+  gl.uniform1f(uC.u_ringWN, BULBS ? wN : 0);
+  gl.uniform1f(uC.u_ringWSpan, wSpan);
+  gl.uniform1f(uC.u_ringWPh0, wPh0);
   // orbit camera from the mouse, with a slow handheld drift on top;
   // target height and orbit radius scale with the glass so every shape frames
   const taY  = 0.33*shape.H + 0.35*shape.y0;   // aim nearer the bowl on stemware
-  const orbR = 1.15 + 0.78*shape.H;
-  const caz = (sm[0]-0.5)*2.6 + 0.010*snz(t*0.23, 11.0);
+  const orbR = (1.15 + 0.78*shape.H)*zoomSm;   // SHIFT+drag / wheel zoom
+  // light painting locks the tripod: no handheld drift on the orbit.
+  // Full-turn azimuth: one screen-width of drag = one revolution.
+  const caz = (sm[0]-0.5)*6.2832 + (lightPaint ? 0 : 0.010*snz(t*0.23, 11.0));
   const ch  = 0.30 + (1.0-sm[1])*(1.35 + shape.H)   // table level to top-down
-            + 0.012*snz(t*0.19, 7.0);
+            + (lightPaint ? 0 : 0.012*snz(t*0.19, 7.0));
   const rox = Math.sin(caz)*orbR, roz = Math.cos(caz)*orbR;
   gl.uniform3f(uC.u_ro, rox, ch, roz);
   gl.uniform1f(uC.u_taY, taY);
@@ -1043,6 +1317,7 @@ function frame(){
   gl.viewport(0, 0, bloomA.w, bloomA.h);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, scene.tex);
   gl.uniform1i(uBr.u_tex, 0);
+  gl.uniform1f(uBr.u_arty, lightPaint ? 1 : 0);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.useProgram(blurProg);
   gl.bindFramebuffer(gl.FRAMEBUFFER, bloomB.fb);
@@ -1064,12 +1339,15 @@ function frame(){
   gl.uniform1i(uFin.u_scene, 0);
   gl.uniform1i(uFin.u_bloom, 1);
   gl.uniform1f(uFin.u_time, t);
-  // handheld: slow frame sway + a faint high-frequency tremor (uv units)
-  gl.uniform2f(uFin.u_wob,
+  // handheld: slow frame sway + a faint high-frequency tremor (uv units);
+  // the light-painting tripod holds the frame dead still
+  if(lightPaint) gl.uniform2f(uFin.u_wob, 0, 0);
+  else gl.uniform2f(uFin.u_wob,
     0.0016*snz(t*0.50, 1.7) + 0.0005*snz(t*2.9, 9.2),
     0.0013*snz(t*0.44, 4.9) + 0.0005*snz(t*3.3, 2.2));
   gl.uniform2f(uFin.u_px, 1/canvas.width, 1/canvas.height);
   gl.uniform1f(uFin.u_focus, Math.hypot(rox, ch - taY, roz));
+  gl.uniform1f(uFin.u_arty, lightPaint ? 1 : 0);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
   if(wantShot){

@@ -58,6 +58,11 @@ uniform float u_bub;        // bubbles seeded in the glass wall (0..1)
 uniform float u_bubSize;    // seed size scale (cell scales too: big = fewer)
 uniform float u_rim;        // metallic painted rim: 0 off, 1 on
 uniform vec3  u_rimCol;     // rim metal colour (gold by default)
+uniform float u_metal;      // splashed-metal skin: coverage (0 none .. 1 heavy)
+uniform float u_metalSeed;  // reshuffles the blotches per deal
+uniform vec3  u_metalCol;   // which metal (silver / gold / copper)
+uniform float u_metalScale; // blotch size: big islands .. fine speckle
+uniform float u_metalWarp;  // domain warp: round blobs .. stringy splatter
 
 float hash12(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453123); }
 vec2  hash22(vec2 p){
@@ -463,6 +468,25 @@ float dapple(vec3 P, int li){
   float m = canopyField(cp, u_dappleOff[li]).x;   // crisp-edged patches
   return mix(1.0, 0.06 + 0.94*m, u_leaf);         // deep shade floor
 }
+
+// splashed-metal skin (light painting): a noise-thresholded mask over the
+// wall. Sampled in WORLD space so it wraps the circumference seamlessly,
+// and defined here in SHARED so the photon tracer and the composite agree:
+// the mirror you see is exactly the mirror that blocks the light.
+float metalAt(vec3 P){
+  if(u_metal <= 0.001) return 0.0;
+  // two decorrelated world-plane fbms blended, one warping the other's
+  // domain: isotropic splashes with no built-in grain direction (a single
+  // height-sheared sample used to stripe every deal with the same spiral).
+  // Scale and warp are per-deal: big islands .. fine stringy splatter.
+  vec2 q1 = vec2(P.x*0.9 + P.y*0.35, P.z*0.9 - P.y*0.28)*u_metalScale;
+  vec2 q2 = vec2(P.z*1.1 + P.y*0.90, P.x*1.1 + P.y*0.55)*u_metalScale*1.31;
+  float wp = fbm(q2 + u_metalSeed*7.7);
+  float m = fbm(q1 + u_metalSeed*13.7 + (wp - 0.5)*u_metalWarp);
+  m = 0.62*m + 0.38*fbm(q2*0.53 + u_metalSeed*3.9);
+  float edge = mix(0.78, 0.34, u_metal);          // coverage lowers the bar
+  return smoothstep(edge, edge - 0.10, m);
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -478,6 +502,19 @@ uniform float u_mode;      // 0 = transmitted photons, 1 = Fresnel-reflected
 uniform float u_disp;      // dispersion strength
 uniform float u_seed;      // per-frame seed: new photon set every frame, so the
                            // temporal accumulation genuinely denoises
+uniform float u_arty;      // 1 = light painting: lights become neon rings
+uniform vec3  u_ringC[3];  // per-ring centre (off the glass axis, per deal)
+uniform vec3  u_ringU[3];  // per-ring tilted basis × radius: the dipping axis
+uniform vec3  u_ringV[3];  // per-ring tilted basis × radius: the level axis
+uniform vec3  u_ringWC;    // small white ring INSIDE the glass: centre
+uniform vec3  u_ringWU;    // ...its tilted basis × radius
+uniform vec3  u_ringWV;
+uniform float u_ringArc[3];// emission arc half-width per ring (rad): the
+                           // optical softness knob — a wall point sees this
+                           // much tube, so small = lace, large = glow
+uniform float u_ringWN;    // the white light is a STRING OF BULBS: count,
+uniform float u_ringWSpan; // ...the arc they span (rad),
+uniform float u_ringWPh0;  // ...and where along the circle the arc starts
 const int GW = 512;
 const int GH = 288;
 const int PER = GW*GH;
@@ -511,12 +548,66 @@ void main(){
   vec2 j  = hash22(uv*617.0 + float(li)*13.7 + u_seed*1.3) - 0.5;
   vec2 j2 = hash22(uv*233.0 + float(li)*71.3 + u_seed*2.7) - 0.5;
   uv += j / vec2(float(GW), float(GH));
-  vec3 Lj = normalize(L + vec3(j2.x, 0.0, j2.y) * u_soft);
 
-  // launch point: the sun-facing part of the wall
-  float azL = atan(-L.z, -L.x);
-  float th = azL + (uv.x - 0.5) * 2.6;
+  if(u_mode > 1.5){
+    // WHITE BULB STRING (light painting): a series of glowing points along
+    // an arc inside the vessel. Each photon belongs to one bulb — a true
+    // point source, so each bulb lays its own crisp caustic through the
+    // wall (a mirror of the tail of the main path below). Deliberately
+    // unphysical: bulbs that pierce the wall still emit as if from inside.
+    float thw = uv.x*6.2831853;
+    float bk = mod(float(pid), u_ringWN);
+    float phiw = u_ringWPh0 + u_ringWSpan*(bk + 0.5)/u_ringWN;
+    vec3 ringP = u_ringWC + u_ringWU*cos(phiw) + u_ringWV*sin(phiw);
+    ringP += vec3(j2.x, j2.y, hash12(uv*313.1 + u_seed) - 0.5)*0.012;  // bulb size
+    float y3 = mix(u_cavY + 0.02, 0.95*u_H, uv.y);
+    vec3 P3 = vec3(cos(thw), 0.0, sin(thw))*innerR(thw, y3);
+    P3.y = y3;
+    vec3 dw = normalize(P3 - ringP);
+    vec3 Nin2 = -innerNormal(P3);
+    dw = refract(dw, Nin2, 1.0/nGl);            // air inside: empty glass
+    if(dot(dw,dw) < 0.1){ kill(); return; }
+    float th4w = atan(P3.z, P3.x);
+    vec3 Ns2w = smoothNormal(th4w, P3.y);
+    float t2w = wallAt(th4w, P3.y) / max(dot(dw, Ns2w), 0.30);
+    vec3 P4w = P3 + dw*t2w;
+    vec3 N4w = outerNormal(atan(P4w.z, P4w.x), clamp(P4w.y, 0.0, u_H));
+    vec3 doutw = refract(dw, -N4w, nGl);
+    if(dot(doutw,doutw) < 0.1){ kill(); return; }
+    float c4w = abs(dot(N4w, doutw));
+    float ww = 1.0 - (0.04 + 0.96*pow(1.0 - c4w, 5.0));
+    ww *= 1.0 - metalAt(P4w);            // the skin blocks the bulb too
+    if(doutw.y > -0.03){ kill(); return; }
+    float s4w = -P4w.y / doutw.y;
+    if(s4w > 6.0){ kill(); return; }
+    vec3 hitw = P4w + doutw*s4w;
+    gl_Position = vec4((hitw.xz - u_caustC)/u_caustS, 0.0, 1.0);
+    gl_PointSize = 1.5;
+    v_col = vec3(1.05) * ww * chCol * 0.85;     // white, dispersing at edges
+    return;
+  }
+
   float y  = mix(0.02, 0.99*u_H, uv.y);
+
+  float th;
+  vec3 Lj;
+  vec3 lcol = u_lightCol[li];
+  if(u_arty > 0.5 && li < 2){
+    // THE colored hoop: one tube per deal, in one rolled colour — slots 0
+    // and 1 both pour into it (double density). Slot 2 falls through to
+    // the directional path below: a bare distant sun over the void.
+    // Jitter along the tube IS the penumbra (u_ringArc[0]: lace ↔ glow).
+    th = uv.x*6.2831853;
+    float phi = th + j2.x*u_ringArc[0];           // emitting tube point
+    vec3 ringP = u_ringC[0] + u_ringU[0]*cos(phi) + u_ringV[0]*sin(phi);
+    ringP.y += j2.y*0.08;                         // tube thickness
+    Lj = normalize(outerPos(th, y) - ringP);
+    lcol = u_lightCol[0];
+  } else {
+    Lj = normalize(L + vec3(j2.x, 0.0, j2.y) * u_soft);
+    // launch point: the sun-facing part of the wall
+    th = atan(-L.z, -L.x) + (uv.x - 0.5) * 2.6;
+  }
 
   vec3 P1 = outerPos(th, y);
   vec3 N1 = outerNormal(th, y);
@@ -539,8 +630,8 @@ void main(){
   float face = dot(N1, -Lj);
   if(face <= 0.02){ kill(); return; }
 
-  // occlusion by the leaves above
-  float w = face * dapple(P1, li);
+  // occlusion by the leaves above (no foliage between a neon tube and glass)
+  float w = face * (u_arty > 0.5 ? 1.0 : dapple(P1, li));
   if(w < 0.004){ kill(); return; }
   w *= 1.0 - 0.40*mistP;
   w *= profileR(y)/u_maxR;   // launch grid is uniform in (th,y); weight by area
@@ -553,6 +644,12 @@ void main(){
     rimTint = u_rimCol;
   }
 
+  // splashed metal on the entry wall (light painting only): an opaque
+  // mirror — it blocks the transmitted beam and feeds the reflection
+  // caustic in the metal's own colour
+  float metE = metalAt(P1)*u_arty;
+  if(metE > 0.0) rimTint = mix(rimTint, u_metalCol, metE);
+
   // Fresnel at entry
   float c1 = abs(dot(N1, Lj));
   float F = 0.04 + 0.96*pow(1.0 - c1, 5.0);
@@ -561,17 +658,19 @@ void main(){
     // ---- the REFLECTION caustic: the energy the wall bounces off,
     // landing as a bright arc on the sun side of the glass
     vec3 dr = reflect(Lj, N1);
-    float wr = w * F;
+    float wr = w * mix(F, 0.80, metE);
     if(dr.y > -0.03 || wr < 0.002){ kill(); return; }
     float sr = -P1.y / dr.y;
     if(sr > 6.0){ kill(); return; }
     vec3 hitr = P1 + dr*sr;
     gl_Position = vec4((hitr.xz - u_caustC)/u_caustS, 0.0, 1.0);
     gl_PointSize = 1.5;
-    v_col = u_lightCol[li] * wr * rimTint;     // mirror bounce (gold on the rim)
+    v_col = lcol * wr * rimTint;               // mirror bounce (gold on the rim)
     return;
   }
   w *= 1.0 - F;
+  w *= 1.0 - metE;                       // the coated patches pass nothing
+  if(w < 0.002){ kill(); return; }
 
   // ---- refraction 1: air -> glass, at the faceted outer wall
   vec3 d = refract(Lj, N1, 1.0/nGl);
@@ -598,12 +697,13 @@ void main(){
     vec3 N4b = outerNormal(atan(P4b.z, P4b.x), clamp(P4b.y, 0.0, u_H));
     vec3 db = refract(d, -N4b, nGl);
     if(dot(db,db) < 0.1 || db.y > -0.03){ kill(); return; }
+    w *= 1.0 - metalAt(P4b)*u_arty;      // skin on the slab's exit face
     float sb = -P4b.y / db.y;
     if(sb > 6.0){ kill(); return; }
     vec3 hitb = P4b + db*sb;
     gl_Position = vec4((hitb.xz - u_caustC)/u_caustS, 0.0, 1.0);
     gl_PointSize = 1.5;
-    v_col = u_lightCol[li] * exp(-s0*u_glassSig*1.6) * w * chCol;
+    v_col = lcol * exp(-s0*u_glassSig*1.6) * w * chCol;
     return;
   }
 
@@ -699,6 +799,7 @@ void main(){
   if(dot(dout,dout) < 0.1){ kill(); return; }
   float c4 = abs(dot(N4, dout));
   w *= 1.0 - (0.04 + 0.96*pow(1.0 - c4, 5.0));
+  w *= 1.0 - metalAt(P4)*u_arty;         // coated exit: light stays inside
 
   // ---- land on the table
   if(dout.y > -0.03){ kill(); return; }
@@ -710,7 +811,7 @@ void main(){
   vec2 clip = (hit.xz - u_caustC)/u_caustS;
   gl_Position = vec4(clip, 0.0, 1.0);
   gl_PointSize = 1.5;
-  v_col = u_lightCol[li] * tint * w * chCol;
+  v_col = lcol * tint * w * chCol;
 }
 `;
 
@@ -767,17 +868,34 @@ void main(){
 }
 `;
 
+// auto-exposure probe (light painting): the caustic pool's luminance packed
+// to fit RGBA8 (÷4 — the accumulation peaks around 4). JS reads this at
+// 16×16 and servos the photon gain, because the ring's per-deal pose changes
+// how many photons survive to the floor.
+const EXPO_FS = `#version 300 es
+precision highp float;
+in vec2 v_uv; out vec4 o;
+uniform sampler2D u_tex;
+void main(){
+  float l = dot(texture(u_tex, v_uv).rgb, vec3(0.2126, 0.7152, 0.0722));
+  o = vec4(vec3(l*0.25), 1.0);
+}
+`;
+
 // bloom bright pass: keep only what outshines the blown-out backdrop
 const BRIGHT_FS = `#version 300 es
 precision highp float;
 in vec2 v_uv; out vec4 o;
 uniform sampler2D u_tex;
+uniform float u_arty;
 void main(){
   vec3 c = texture(u_tex, v_uv).rgb;
   // soft knee starting just above the backdrop level (~1.2): the backdrop
-  // halates faintly, sparkles and sun glints bloom hard
+  // halates faintly, sparkles and sun glints bloom hard. In light-painting
+  // mode there is no bright backdrop to protect — drop the knee so the
+  // caustic filaments themselves halate against the void
   float l = max(max(c.r, c.g), c.b);
-  o = vec4(c * smoothstep(1.05, 1.9, l), 1.0);
+  o = vec4(c * smoothstep(mix(1.05, 0.30, u_arty), mix(1.9, 1.5, u_arty), l), 1.0);
 }
 `;
 
@@ -793,6 +911,7 @@ uniform float u_time;
 uniform vec2  u_wob;         // handheld frame wobble (uv units)
 uniform vec2  u_px;          // one pixel, in uv units
 uniform float u_focus;       // camera-to-glass distance: the focal plane
+uniform float u_arty;        // light painting: the pool IS the subject — no DoF
 float hash12(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453123); }
 void main(){
   vec2 uv = v_uv + u_wob;
@@ -808,7 +927,7 @@ void main(){
 
   // depth of field: the glass holds focus, the far table and the backdrop
   // melt away like a phone lens wide open
-  float coc = smoothstep(u_focus + 1.3, u_focus + 7.0, sc.a);
+  float coc = smoothstep(u_focus + 1.3, u_focus + 7.0, sc.a) * (1.0 - u_arty);
   vec3 col = sharp;
   if(coc > 0.003){
     float r = coc * 9.0;                    // blur radius in pixels
@@ -861,6 +980,16 @@ uniform float u_pen;         // shadow penumbra scale (noon hard, dusk soft)
 uniform float u_night;       // 1 = night: string lights + stars in the sky
 uniform float u_table;       // 0 stone, 1 wood planks, 2 glazed tiles, 3 concrete, 4 pale wood
 uniform float u_tabRot;      // per-deal spin of the plank direction
+uniform float u_arty;        // 1 = light painting: void + caustic + ghost vessel
+uniform vec3  u_ringC[3];    // neon rings: centres
+uniform vec3  u_ringU[3];    // neon rings: tilted basis × radius (dipping axis)
+uniform vec3  u_ringV[3];    // neon rings: tilted basis × radius (level axis)
+uniform vec3  u_ringWC;      // white bulb string inside the glass: its circle
+uniform vec3  u_ringWU;
+uniform vec3  u_ringWV;
+uniform float u_ringWN;      // bulb count
+uniform float u_ringWSpan;   // arc span (rad)
+uniform float u_ringWPh0;    // arc start phase
 in vec2 v_uv;
 out vec4 o;
 
@@ -1158,6 +1287,107 @@ void main(){
         if(Q.y > u_liq + 0.005 && (tGlass < 0.0 || sA + tI < tGlass)) tIceAir = sA + tI;
       }
     }
+  }
+
+  if(u_arty > 0.5){
+    // ---------- LIGHT PAINTING ----------
+    // Nothing in the frame is an object any more. The void is black and the
+    // only paint is the light itself: the long-exposure caustic pool, the
+    // facet glints, and a Fresnel ghost where the vessel stands. The pool is
+    // sampled first so it glows straight through the ghost.
+    vec3 colA = vec3(0.0);
+    float hitA = 30.0;
+    if(tTable < 1e4){
+      hitA = tTable;
+      vec3 P = ro + rd*tTable;
+      vec2 cuv = (P.xz - u_caustC)/u_caustS * 0.5 + 0.5;
+      if(all(greaterThan(cuv, vec2(0.0))) && all(lessThan(cuv, vec2(1.0)))){
+        vec3 cSharp = texture(u_caust,  cuv).rgb;
+        vec3 cSoft  = texture(u_caustB, cuv).rgb;
+        // sharp filaments first, halo demoted to a whisper: on a black
+        // void the blurred layer reads as fog, not glow. The gentler lift
+        // keeps faint trails without milking the darks.
+        colA = pow(max(cSharp*1.45 + cSoft*0.35, vec3(0.0)), vec3(0.88));
+      }
+    }
+    float tG = tGlass > 0.0 ? tGlass : 1e5;
+    if(tLiq < tG && tLiq < 1e4){
+      // looking down onto the open surface: a dim ember disc, the pool
+      // shimmering faintly beneath it
+      hitA = min(hitA, tLiq);
+      vec3 Pl = ro + rd*tLiq;
+      colA = colA*0.25 + u_liqGlow*0.045;
+      for(int i=0;i<NL;i++){
+        vec3 hr = reflect(u_lightDir[i], vec3(0.0, 1.0, 0.0));
+        colA += u_lightCol[i] * pow(max(dot(hr, -rd), 0.0), 300.0) * 1.5;
+      }
+    } else if(tG < 1e4){
+      hitA = min(hitA, tGlass);
+      vec3 P = ro + rd*tGlass;
+      vec3 N = glassNormal(P);
+      float fres = pow(clamp(1.0 + dot(rd, N), 0.0, 1.0), 3.0);
+      float fp = facetPattern(atan(P.z, P.x), clamp(P.y, 0.0, u_H));
+      // the vessel drawn only where it grazes the eye: a cold rim above the
+      // waterline, the drink's own ember below it
+      vec3 ghost = mix(vec3(0.42, 0.62, 1.05), u_liqGlow*vec3(1.05, 0.80, 0.55),
+                       smoothstep(u_liq + 0.03, u_liq - 0.06, P.y));
+      // splashed metal: where the skin sits, the vessel goes opaque mirror —
+      // the pool stops shining through and every light mirrors at full
+      // strength in the metal's colour, not just at grazing angles
+      float met = metalAt(P);
+      colA *= 1.0 - 0.35*fres;                    // the rim dims the pool behind
+      colA *= 1.0 - 0.85*met;                     // the skin blocks it outright
+      colA += ghost * fres * (0.14 + 0.22*fp) * (1.0 - met);
+      vec3 mirW = mix(vec3(0.25 + 1.4*fres), 1.5*u_metalCol, met);
+      // the hoop mirrored in the wall: intersect the reflected view ray
+      // with its plane and glow by distance to the circle
+      vec3 rr = reflect(rd, N);
+      for(int k=0;k<1;k++){
+        vec3 nrm = normalize(cross(u_ringU[k], u_ringV[k]));
+        float denom = dot(rr, nrm);
+        if(abs(denom) < 1e-4) continue;
+        float tpl = dot(u_ringC[k] - P, nrm)/denom;
+        if(tpl <= 0.0) continue;
+        vec3 Q = P + rr*tpl - u_ringC[k];
+        float R2 = dot(u_ringU[k], u_ringU[k]);
+        vec2 q = vec2(dot(Q, u_ringU[k]), dot(Q, u_ringV[k]))/R2; // 1 = on the hoop
+        float d = abs(length(q) - 1.0)*sqrt(R2);
+        float tubeG = exp(-d*d/0.012) + 0.25*exp(-d*d/0.15);      // core + halo
+        colA += u_lightCol[k] * tubeG * mirW;
+      }
+      // ...and the white bulbs, mirrored in the wall as a string of glints
+      for(int k=0;k<12;k++){
+        if(float(k) >= u_ringWN) break;
+        float ph = u_ringWPh0 + u_ringWSpan*(float(k) + 0.5)/u_ringWN;
+        vec3 Pk = u_ringWC + u_ringWU*cos(ph) + u_ringWV*sin(ph);
+        vec3 vk = Pk - P;
+        float tk = dot(vk, rr);
+        if(tk <= 0.0) continue;
+        float d2k = dot(vk - rr*tk, vk - rr*tk);
+        float tgw = exp(-d2k/0.00015) + 0.12*exp(-d2k/0.003);
+        colA += vec3(1.25, 1.25, 1.20) * tgw * mirW;
+      }
+      // the distant sun's glint: one hard sparkle per facet
+      vec3 hs = reflect(u_lightDir[2], N);
+      colA += u_lightCol[2] * pow(max(dot(hs, -rd), 0.0), 200.0) * (3.0*(1.0 - met) + 2.5*met) * mix(vec3(1.0), u_metalCol, met);
+    }
+    // the white bulbs, seen directly — the one light in the piece you can
+    // look at: a string of hot points hanging in the vessel. Deliberately
+    // unphysical: they draw over the ghost and through the wall.
+    for(int k=0;k<12;k++){
+      if(float(k) >= u_ringWN) break;
+      float ph = u_ringWPh0 + u_ringWSpan*(float(k) + 0.5)/u_ringWN;
+      vec3 Pk = u_ringWC + u_ringWU*cos(ph) + u_ringWV*sin(ph);
+      vec3 vk = Pk - ro;
+      float tk = dot(vk, rd);
+      if(tk <= 0.0 || (tTable < 1e4 && tk > tTable)) continue;
+      float d2k = dot(vk - rd*tk, vk - rd*tk);
+      float g = exp(-d2k/0.00015) + 0.10*exp(-d2k/0.003);
+      colA += vec3(1.45, 1.45, 1.38) * g;
+      if(g > 0.5) hitA = min(hitA, tk);           // the bulbs hold focus
+    }
+    o = vec4(colA, hitA);
+    return;
   }
 
   vec3 col;
