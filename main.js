@@ -303,7 +303,7 @@ const LIQUIDS = {
   redWine:   { hex:'#7a1622', turb:0.10, n:1.36, fizz:0.00, scat:'#a8323f' },
   rose:      { hex:'#f2c2a4', turb:0.05, n:1.36, fizz:0.00, scat:'#f6d8c2' },
   whiskey:   { hex:'#b05e14', turb:0.02, n:1.36, fizz:0.00, scat:'#d08428' },
-  mojito:    { hex:'#e2e6a8', turb:0.18, n:1.34, fizz:0.55, scat:'#eef0c6' },
+  chartreuse:{ hex:'#e2e6a8', turb:0.18, n:1.34, fizz:0.55, scat:'#eef0c6' },
   blueLagoon:{ hex:'#1e6fd8', turb:0.08, n:1.34, fizz:0.60, scat:'#4a9ae8' },
   icedTea:   { hex:'#8a4514', turb:0.06, n:1.34, fizz:0.00, scat:'#b06a2a' },
   champagne: { hex:'#eedc9a', turb:0.03, n:1.34, fizz:1.35, scat:'#f5ecb4' },
@@ -354,17 +354,17 @@ const rng  = (r, a, b) => a + r()*(b - a);
 
 // what belongs in what: no soda martinis, no ice in the wine
 const SHAPE_LIQUIDS = {
-  highball: ['soda','oj','water','sparkling','mojito','blueLagoon','icedTea',
+  highball: ['soda','oj','water','sparkling','chartreuse','blueLagoon','icedTea',
              'pastis','lemonade','shirleyTemple','ginFizz','appleJuice'],
   rocks:    ['whiskey','soda','icedTea','empty','blueLagoon','gin'],
   shot:     ['whiskey','empty','water','gin'],
-  barrel:   ['soda','oj','icedTea','water','mojito','appleJuice','lemonade','shirleyTemple'],
+  barrel:   ['soda','oj','icedTea','water','chartreuse','appleJuice','lemonade','shirleyTemple'],
   flared:   ['oj','water','sparkling','rose','icedTea','lemonade','appleJuice','pastis','ginFizz'],
   wine:     ['redWine','whiteWine','rose','empty','spritz'],
   martini:  ['blueLagoon','rose','whiteWine','empty','gin'],
   flute:    ['sparkling','rose','whiteWine','champagne'],
-  goblet:   ['redWine','mojito','blueLagoon','soda','water','spritz','appleJuice'],
-  fishbowl: ['mojito','blueLagoon','water','soda','lemonade','shirleyTemple','ginFizz'],
+  goblet:   ['redWine','chartreuse','blueLagoon','soda','water','spritz','appleJuice'],
+  fishbowl: ['chartreuse','blueLagoon','water','soda','lemonade','shirleyTemple','ginFizz'],
   alembic:  ['water','pastis','blueLagoon','icedTea','lemonade','empty'],
   bottle:   ['redWine','whiteWine','rose','water'],
 };
@@ -381,7 +381,7 @@ const GLASS_TINTS = ['#eefbf1','#eefbf1','#eefbf1','#e8f2fa','#f8ece8','#eaf6e2'
 const SAT_TINTS = ['#2e62c9','#1f8f8a','#c98a2e','#c02e48','#7a8f2e',
                    '#7a4fc0','#5a5a60','#d06a8a'];
 const RIM_ODDS = { wine:0.35, martini:0.35, flute:0.40, goblet:0.30 };
-const COLD_LIQS = ['soda','water','icedTea','mojito','blueLagoon','oj','sparkling','whiskey',
+const COLD_LIQS = ['soda','water','icedTea','chartreuse','blueLagoon','oj','sparkling','whiskey',
                    'gin','lemonade','shirleyTemple','ginFizz'];
 
 // ---------------------------------------------------------------------------

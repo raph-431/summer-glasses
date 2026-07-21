@@ -18,7 +18,7 @@ const DRINK_LINE = {
   redWine:       ["red wine, deep and dark", "dark red wine glows deep", "the red wine runs deep", "bold red wine, held close", "the dark holds embers"],
   rose:          ["pale rosé glows pink", "rosé catches light", "cold rosé, pale pink", "the rosé glows soft", "a blush, held in glass"],
   whiskey:       ["amber whiskey glows", "whiskey catches light", "a dram, warm and deep", "whiskey, amber, still", "years, distilled to warmth"],
-  mojito:        ["mint and lime, ice clinks", "mojito fizzes", "mint leaves catch the light", "cold mint, ice, and rum", "mint, cool as a breath"],
+  chartreuse:    ["green chartreuse glows", "herbal green, cold light", "chartreuse, bright and green", "a green fire, distilled", "green as a summer leaf"],
   blueLagoon:    ["blue lagoon glows bright", "electric blue glows", "the blue lagoon gleams", "ocean blue, ice-cold", "a sky turned to sea"],
   icedTea:       ["amber iced tea glows", "cold tea, steeped and dark", "iced tea catches light", "cool tea, amber, deep", "slow hours, steeped and cold"],
   champagne:     ["champagne bubbles rise", "cold champagne, pale gold", "champagne catches light", "bright bubbles, pale gold", "small stars, set alight"],
