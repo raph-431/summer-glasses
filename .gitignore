@@ -20,6 +20,7 @@ relayer-pw.txt
 *.password
 .env
 .env.*
+summer glasses onchain info.rtf
 
 # editor state
 .vscode/
@@ -34,3 +35,7 @@ summer-glass-*.jpg
 web/node_modules/
 web/package-lock.json
 web/.test-key
+
+# editor local-history snapshots
+.history/
+Untitled
