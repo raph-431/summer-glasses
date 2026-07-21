@@ -18,11 +18,13 @@ contract Deploy is Script {
         uint256 price = vm.envOr("PRICE", uint256(0.002 ether));
         uint96 stipend = uint96(vm.envOr("STIPEND", uint256(0.00005 ether)));
         uint256 supply = vm.envOr("MAX_SUPPLY", uint256(256));
+        uint256 giftCap = vm.envOr("MAX_GIFTS_PER_PAYER", uint256(0)); // 0 = unlimited
 
         bytes memory payload = bytes(vm.readFile("../dist/payload.b64"));
 
         vm.startBroadcast();
         SummerGlasses glasses = new SummerGlasses(price, stipend, supply);
+        if (giftCap != 0) glasses.setMaxGiftsPerPayer(giftCap);
         glasses.setArtWrapper(
             bytes(vm.readFile("../dist/art-prefix1.txt")),
             bytes(vm.readFile("../dist/art-prefix2.txt")),
@@ -41,5 +43,6 @@ contract Deploy is Script {
         console.log("price (wei):", price);
         console.log("stipend (wei):", stipend);
         console.log("max supply:", supply);
+        console.log("max gifts/payer (0=unlimited):", giftCap);
     }
 }

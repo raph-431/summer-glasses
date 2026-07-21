@@ -19,7 +19,8 @@ node web/test/redeem-recovery.mjs   # redeem never reports a false failure
 | gas stipend | **0.00005 ETH** (`50000000000000`) | constructor / `setGasStipend` | snapshot per gift; see sizing below |
 | max supply | **deploy a ceiling, do NOT `lockSupply()` yet** | constructor / `setMaxSupply` + `lockSupply()` | staying unlocked keeps the edition size adjustable until demand is known; lock later to make it credible + irreversible |
 | royalty | **none** (leave default 0) | `setRoyalty(receiver, bps)` | ERC-2981, default off; can be set any time later |
-| reclaim window | 365 days | — | fixed constant |
+| reclaim window | 7 days | — | fixed constant (`RECLAIM_AFTER`); a lost/unredeemed gift is reclaimable by its gifter after a week |
+| gifts per payer | **set a cap** (e.g. a few % of supply) | `MAX_GIFTS_PER_PAYER` env / `setMaxGiftsPerPayer` | 0 = unlimited; bounds outstanding gifts per address so one payer can't reserve the whole edition and reclaim later. Sybil across addresses still bypasses it — this stops casual squatting, not a funded attacker |
 
 **Stipend sizing:** redeem ≈ 220k gas. On Base (~0.01 gwei typical) that is
 ~0.000002 ETH execution + L1 data fee. The default 0.00005 ETH covers a
@@ -33,7 +34,7 @@ Use a throwaway funded key (faucet: https://portal.cdp.coinbase.com/products/fau
 ```sh
 node build.js
 cd contract
-PRICE=2000000000000000 STIPEND=50000000000000 MAX_SUPPLY=256 \
+PRICE=2000000000000000 STIPEND=50000000000000 MAX_SUPPLY=256 MAX_GIFTS_PER_PAYER=8 \
 forge script script/Deploy.s.sol --rpc-url https://sepolia.base.org \
   --private-key $DEPLOYER_PK --broadcast
 # optional source verification (needs BASESCAN_API_KEY):
@@ -108,4 +109,4 @@ cast send $CONTRACT "freezeArt()" …                                # art is no
   mutable (it's a thumbnail convenience, not the artwork); leaving it unset
   keeps tokens animation_url-only.
 - If a gifted code is reported lost: nothing to do — the gifter reclaims
-  after the year, on their own.
+  after the week, on their own.
