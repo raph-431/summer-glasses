@@ -13,13 +13,13 @@ node web/test/redeem-recovery.mjs   # redeem never reports a false failure
 
 ## 0 · Decisions to make (once, at launch)
 
-| decision | where | notes |
-|---|---|---|
-| price | constructor / `setPrice` | changeable any time (affects future gifts) |
-| gas stipend | constructor / `setGasStipend` | snapshot per gift; see sizing below |
-| max supply | constructor / `setMaxSupply` + `lockSupply()` | lock makes it credible + irreversible |
-| royalty | `setRoyalty(receiver, bps)` | ERC-2981, default off; changeable any time |
-| reclaim window | — | fixed constant: 365 days |
+| decision | chosen | where | notes |
+|---|---|---|---|
+| price | **0.002 ETH** (`2000000000000000`) | constructor / `setPrice` | "the price of a drink"; changeable any time (affects future gifts) |
+| gas stipend | **0.00005 ETH** (`50000000000000`) | constructor / `setGasStipend` | snapshot per gift; see sizing below |
+| max supply | **deploy a ceiling, do NOT `lockSupply()` yet** | constructor / `setMaxSupply` + `lockSupply()` | staying unlocked keeps the edition size adjustable until demand is known; lock later to make it credible + irreversible |
+| royalty | **none** (leave default 0) | `setRoyalty(receiver, bps)` | ERC-2981, default off; can be set any time later |
+| reclaim window | 365 days | — | fixed constant |
 
 **Stipend sizing:** redeem ≈ 220k gas. On Base (~0.01 gwei typical) that is
 ~0.000002 ETH execution + L1 data fee. The default 0.00005 ETH covers a
