@@ -7,7 +7,8 @@
 | contract | `0x87e957299624dE48285ff420989749760b58a4A8` (Base, chainId 8453) |
 | owner / deployer | `0xa4Cf6e6bc4264711f107d6fEb60f256Ae0a7055C` (keystore `deployer-base`) |
 | relayer | `0xdA5BDb3Cfd7406dFd873D2E983901C0ADDCe9222` (keystore `relayer-base`) |
-| site | https://summerdrinks.vercel.app (`/api/status` = health check) |
+| site | https://summerdrinks.fun (`/api/status` = health check) |
+| source | verified on Basescan, **exact match** |
 | params | price 0.002 ETH · stipend 0.00005 ETH · maxSupply 1000 |
 | minted | #1 (real gift→redeem, seed verified against tokenURI) |
 | Sepolia rehearsal | `0x179a7697554a759acbe5d1913346b6687eC7e504` (same art, byte-identical) |
