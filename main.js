@@ -300,7 +300,7 @@ const LIQUIDS = {
   water:     { hex:'#f2f6f4', turb:0.00, n:1.33, fizz:0.00, scat:'#ffffff' },
   sparkling: { hex:'#f0f3ea', turb:0.02, n:1.33, fizz:1.20, scat:'#f5f2df' },
   whiteWine: { hex:'#e8d68a', turb:0.03, n:1.36, fizz:0.00, scat:'#efe3a8' },
-  redWine:   { hex:'#4a0e18', turb:0.10, n:1.36, fizz:0.00, scat:'#7a1f2c' },
+  redWine:   { hex:'#7a1622', turb:0.10, n:1.36, fizz:0.00, scat:'#a8323f' },
   rose:      { hex:'#f2c2a4', turb:0.05, n:1.36, fizz:0.00, scat:'#f6d8c2' },
   whiskey:   { hex:'#b05e14', turb:0.02, n:1.36, fizz:0.00, scat:'#d08428' },
   mojito:    { hex:'#e2e6a8', turb:0.18, n:1.34, fizz:0.55, scat:'#eef0c6' },
