@@ -30,9 +30,9 @@ export const base = {
   rpc: 'https://mainnet.base.org',
   explorer: 'https://basescan.org',
   currency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-  contract: '0x_DEPLOYED_CONTRACT_HERE',
+  contract: '0x87e957299624dE48285ff420989749760b58a4A8',
   relayer: '/api',   // Vercel serverless function on the same domain
   explorerTx: 'https://basescan.org/tx/',
 };
 
-export default baseSepolia;
+export default base;
