@@ -19,7 +19,7 @@ export const baseSepolia = {
   rpc: 'https://sepolia.base.org',
   explorer: 'https://sepolia.basescan.org',
   currency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-  contract: '0xd44395a4832fdb631b3fd3ecb39e94b7da022e07',
+  contract: '0x179a7697554a759acbe5d1913346b6687eC7e504',
   relayer: '/api',   // Vercel serverless function on the same domain (web/api/redeem.mjs)
   explorerTx: 'https://sepolia.basescan.org/tx/',
 };
