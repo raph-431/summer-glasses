@@ -465,24 +465,26 @@ function randomize(){
     if(cuts.length && r() < 0.75) set('pat', pick(r, cuts));
   }
 
-  // An empty glass is a deliberate rarity, so its odds are set here rather
-  // than left to fall out of how many drinks each shape happens to allow
-  // (which put it near 9%). Shapes that never take one are unaffected.
-  const EMPTY_ODDS = 0.05;
+  // A brimful glass — a generous pour right up near the rim — is a deliberate
+  // rarity, the counterpart to the ordinary pour. Its odds are set here rather
+  // than left to fall out of how many drinks each shape happens to allow. The
+  // glass is never left empty: there is always a drink in it.
+  const FULL_ODDS = 0.05;
   const pours = SHAPE_LIQUIDS[shapeName].filter(l => l !== 'empty');
-  const canBeEmpty = SHAPE_LIQUIDS[shapeName].includes('empty');
-  const liqName = (canBeEmpty && r() < EMPTY_ODDS) ? 'empty' : pick(r, pours);
+  const liqName = pick(r, pours);
   $('liquid').value = liqName;
   liquid = LIQUIDS[liqName];
   set('colaCol', liquid.hex);
   set('turb', Math.min(1, liquid.turb*rng(r, 0.7, 1.3)).toFixed(2));
   set('fizz', (liquid.fizz*rng(r, 0.6, 1.3)).toFixed(2));
-  const fillV = rng(r, 0.25, 0.85);
+  const brimful = r() < FULL_ODDS;
+  const fillV = brimful ? rng(r, 0.92, 1.0) : rng(r, 0.25, 0.85);
   set('liq', fillV.toFixed(2));
 
-  // ice belongs in tumblers holding a cold drink, with at least a half pour
+  // ice belongs in tumblers holding a cold drink, with at least a half pour —
+  // but never in a brimful glass, where a floating cube would crest the rim
   const iceOK = shape.y0 === 0 && !shape.noIce && !liquid.empty && fillV >= 0.5
-             && COLD_LIQS.includes(liqName);
+             && !brimful && COLD_LIQS.includes(liqName);
   $('ice').value = iceOK ? pick(r, ['0','1','1','2','2','3']) : '0';
 
   // condensation follows the cold: iced or fizzy sweats, wine stays dry
