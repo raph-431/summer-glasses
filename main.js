@@ -297,8 +297,8 @@ $('tod').addEventListener('change', e => { $('leaf').value = TIMES[e.target.valu
 const LIQUIDS = {
   soda:      { hex:'#541c17', turb:0.04, n:1.34, fizz:0.80, scat:'#8a4a28' },
   oj:        { hex:'#e08a1e', turb:0.95, n:1.35, fizz:0.00, scat:'#f2a83c' },
-  water:     { hex:'#f2f6f4', turb:0.00, n:1.33, fizz:0.00, scat:'#ffffff' },
-  sparkling: { hex:'#f0f3ea', turb:0.02, n:1.33, fizz:1.20, scat:'#f5f2df' },
+  water:     { hex:'#f2f6f8', turb:0.00, n:1.33, fizz:0.00, scat:'#ffffff' },
+  sparkling: { hex:'#f0f4f6', turb:0.02, n:1.33, fizz:1.20, scat:'#f4f6f8' },
   whiteWine: { hex:'#e8d68a', turb:0.03, n:1.36, fizz:0.00, scat:'#efe3a8' },
   redWine:   { hex:'#7a1622', turb:0.10, n:1.36, fizz:0.00, scat:'#a8323f' },
   rose:      { hex:'#f2c2a4', turb:0.05, n:1.36, fizz:0.00, scat:'#f6d8c2' },
