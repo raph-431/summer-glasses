@@ -314,16 +314,29 @@ $('go').addEventListener('click', async () => {
 /// Did this gift already mint? The slot is deleted on redeem, so an empty
 /// slot means it happened — then find which token `to` received. Tokens are
 /// sequential, so a short walk back from the newest is enough.
+///
+/// The catch: this reads Base's public RPC, which is load-balanced, so right
+/// after a redeem lands one node can still show the slot occupied — or the new
+/// token — a block or two behind the node the relayer used. A single read here
+/// would call a perfectly good mint a failure. So re-read with backoff (a few
+/// Base blocks' worth) before giving up, and treat a flaky read as "not yet",
+/// never as "it failed".
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function findMintedToken(to){
-  const slot = await ethCall(CONFIG.rpc, CONFIG.contract,
-    selector('gifts(address)') + padAddress(claimAddr));
-  const payer = slot.slice(2 + 24, 2 + 64);
-  if(!/^0+$/.test(payer)) return null;            // still unredeemed: a real failure
-  const next = Number(BigInt(await ethCall(CONFIG.rpc, CONFIG.contract, selector('nextId()'))));
-  for(let id = next - 1; id >= 1 && id > next - 25; id--){
-    const owner = await ethCall(CONFIG.rpc, CONFIG.contract,
-      selector('ownerOf(uint256)') + BigInt(id).toString(16).padStart(64, '0')).catch(() => null);
-    if(owner && owner.slice(-40).toLowerCase() === to.slice(2).toLowerCase()) return id;
+  for(let attempt = 0; attempt < 6; attempt++){
+    if(attempt) await sleep(2500);                // ~12s total across the pool
+    const slot = await ethCall(CONFIG.rpc, CONFIG.contract,
+      selector('gifts(address)') + padAddress(claimAddr)).catch(() => null);
+    if(!slot) continue;                            // RPC hiccup — try again, don't conclude
+    const payer = slot.slice(2 + 24, 2 + 64);
+    if(!/^0+$/.test(payer)) continue;              // slot still occupied on this node — maybe stale
+    const next = Number(BigInt(await ethCall(CONFIG.rpc, CONFIG.contract, selector('nextId()')).catch(() => '0x0')));
+    for(let id = next - 1; id >= 1 && id > next - 25; id--){
+      const owner = await ethCall(CONFIG.rpc, CONFIG.contract,
+        selector('ownerOf(uint256)') + BigInt(id).toString(16).padStart(64, '0')).catch(() => null);
+      if(owner && owner.slice(-40).toLowerCase() === to.slice(2).toLowerCase()) return id;
+    }
+    // slot reads empty but the token isn't visible here yet — give it another round
   }
   return null;
 }
