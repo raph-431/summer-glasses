@@ -142,7 +142,7 @@ contract SummerGlassesTest is Test {
 
     function test_ReclaimBeforeExpiryReverts() public {
         doGift();
-        vm.warp(block.timestamp + 365 days - 1);
+        vm.warp(block.timestamp + glasses.RECLAIM_AFTER() - 1);
         vm.prank(gifter);
         vm.expectRevert("not expired");
         glasses.reclaim(claimAddr);
@@ -151,7 +151,7 @@ contract SummerGlassesTest is Test {
     function test_ReclaimAfterExpiryRefunds() public {
         doGift();
         uint256 before = gifter.balance;
-        vm.warp(block.timestamp + 365 days);
+        vm.warp(block.timestamp + glasses.RECLAIM_AFTER());
         vm.prank(gifter);
         glasses.reclaim(claimAddr);
         assertEq(gifter.balance, before + PRICE + STIPEND); // full refund incl. stipend
@@ -161,7 +161,7 @@ contract SummerGlassesTest is Test {
 
     function test_ReclaimNotPayerReverts() public {
         doGift();
-        vm.warp(block.timestamp + 365 days);
+        vm.warp(block.timestamp + glasses.RECLAIM_AFTER());
         vm.prank(recipient);
         vm.expectRevert("not the payer");
         glasses.reclaim(claimAddr);
@@ -169,12 +169,16 @@ contract SummerGlassesTest is Test {
 
     function test_ReclaimedSlotRedeemReverts() public {
         doGift();
-        vm.warp(block.timestamp + 365 days);
+        vm.warp(block.timestamp + glasses.RECLAIM_AFTER());
         vm.prank(gifter);
         glasses.reclaim(claimAddr);
         bytes memory sig = claimSig(claimKey, recipient);
         vm.expectRevert("unknown gift");
         glasses.redeem(claimAddr, recipient, sig);
+    }
+
+    function test_ReclaimWindowIsOneWeek() public view {
+        assertEq(glasses.RECLAIM_AFTER(), 7 days);
     }
 
     // ---- supply ----------------------------------------------------------
@@ -204,7 +208,7 @@ contract SummerGlassesTest is Test {
 
     function test_ReclaimFreesSupply() public {
         test_SupplyCountsOutstandingGifts();
-        vm.warp(block.timestamp + 365 days);
+        vm.warp(block.timestamp + glasses.RECLAIM_AFTER());
         vm.prank(gifter);
         glasses.reclaim(vm.addr(100));
         vm.prank(gifter);
@@ -224,6 +228,62 @@ contract SummerGlassesTest is Test {
         vm.expectRevert("supply locked");
         glasses.setMaxSupply(100);
         vm.stopPrank();
+    }
+
+    // ---- per-payer gift cap ---------------------------------------------
+
+    function test_CapDefaultUnlimited() public {
+        assertEq(glasses.maxGiftsPerPayer(), 0);
+        // gifter can take multiple slots when uncapped
+        for (uint256 i = 0; i < 3; i++) {
+            vm.prank(gifter);
+            glasses.gift{value: PRICE + STIPEND}(vm.addr(200 + i));
+        }
+        assertEq(glasses.outstandingByPayer(gifter), 3);
+    }
+
+    function test_CapBlocksSquatting() public {
+        vm.prank(owner);
+        glasses.setMaxGiftsPerPayer(2);
+        vm.startPrank(gifter);
+        glasses.gift{value: PRICE + STIPEND}(vm.addr(200));
+        glasses.gift{value: PRICE + STIPEND}(vm.addr(201));
+        vm.expectRevert("payer gift limit");
+        glasses.gift{value: PRICE + STIPEND}(vm.addr(202));
+        vm.stopPrank();
+    }
+
+    function test_RedeemFreesPayerBudget() public {
+        vm.prank(owner);
+        glasses.setMaxGiftsPerPayer(1);
+        doGift(); // gifter -> claimAddr, now at the cap
+        vm.prank(gifter);
+        vm.expectRevert("payer gift limit");
+        glasses.gift{value: PRICE + STIPEND}(vm.addr(200));
+
+        // redeeming the outstanding gift returns the gifter's budget
+        glasses.redeem(claimAddr, recipient, claimSig(claimKey, recipient));
+        assertEq(glasses.outstandingByPayer(gifter), 0);
+        vm.prank(gifter);
+        glasses.gift{value: PRICE + STIPEND}(vm.addr(200)); // fits again
+    }
+
+    function test_ReclaimFreesPayerBudget() public {
+        vm.prank(owner);
+        glasses.setMaxGiftsPerPayer(1);
+        doGift();
+        vm.warp(block.timestamp + glasses.RECLAIM_AFTER());
+        vm.prank(gifter);
+        glasses.reclaim(claimAddr);
+        assertEq(glasses.outstandingByPayer(gifter), 0);
+        vm.prank(gifter);
+        glasses.gift{value: PRICE + STIPEND}(vm.addr(200)); // budget restored
+    }
+
+    function test_SetCapOnlyOwner() public {
+        vm.prank(gifter);
+        vm.expectRevert();
+        glasses.setMaxGiftsPerPayer(2);
     }
 
     // ---- funds -----------------------------------------------------------

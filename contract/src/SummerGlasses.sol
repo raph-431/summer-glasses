@@ -27,8 +27,8 @@ import {SSTORE2} from "./SSTORE2.sol";
 ///    the gifter prepaid. The recipient never needs ETH.
 ///  - the token's seed is fixed only at redemption (prevrandao + tokenId +
 ///    recipient): neither party knows which glass it is until it's poured.
-///  - a gift never redeemed can be reclaimed by its gifter after a year, so
-///    lost codes don't strand funds.
+///  - a gift never redeemed can be reclaimed by its gifter after a short
+///    window, so lost codes don't strand funds for long.
 contract SummerGlasses is ERC721, ERC2981, Ownable {
     using Strings for uint256;
 
@@ -45,12 +45,21 @@ contract SummerGlasses is ERC721, ERC2981, Ownable {
     mapping(address => Gift) public gifts;
     uint256 public outstandingGifts; // prepaid but not yet redeemed/reclaimed
 
+    /// per-payer count of outstanding (unredeemed, unreclaimed) gifts, and an
+    /// owner-set ceiling on it. The cap blunts supply-squatting: without it a
+    /// single address can reserve the whole supply (locking real buyers out)
+    /// and reclaim every wei later. 0 = unlimited (the default). A determined
+    /// Sybil can still spread gifts across addresses, so this raises the cost
+    /// of casual griefing rather than eliminating it.
+    mapping(address => uint256) public outstandingByPayer;
+    uint256 public maxGiftsPerPayer;
+
     uint256 public price;
     uint96 public gasStipend;
     uint256 public maxSupply;
     bool public supplyLocked;
 
-    uint256 public constant RECLAIM_AFTER = 365 days;
+    uint256 public constant RECLAIM_AFTER = 7 days;
 
     /// proceeds of redeemed gifts, withdrawable by the owner. Funds of
     /// outstanding gifts are escrow — never touchable by anyone but their
@@ -111,6 +120,10 @@ contract SummerGlasses is ERC721, ERC2981, Ownable {
         require(msg.value >= price + gasStipend, "underpaid");
         require(msg.value <= type(uint96).max, "overpaid");
         require(nextId - 1 + outstandingGifts < maxSupply, "sold out");
+        require(
+            maxGiftsPerPayer == 0 || outstandingByPayer[msg.sender] < maxGiftsPerPayer,
+            "payer gift limit"
+        );
 
         gifts[claimAddr] = Gift({
             payer: msg.sender,
@@ -119,6 +132,7 @@ contract SummerGlasses is ERC721, ERC2981, Ownable {
             stipend: gasStipend
         });
         outstandingGifts += 1;
+        outstandingByPayer[msg.sender] += 1;
         emit Gifted(claimAddr, msg.sender, msg.value);
     }
 
@@ -138,6 +152,7 @@ contract SummerGlasses is ERC721, ERC2981, Ownable {
 
         delete gifts[claimAddr];
         outstandingGifts -= 1;
+        outstandingByPayer[g.payer] -= 1;
         withdrawable += g.paid - g.stipend;
 
         tokenId = nextId++;
@@ -158,6 +173,7 @@ contract SummerGlasses is ERC721, ERC2981, Ownable {
 
         delete gifts[claimAddr];
         outstandingGifts -= 1;
+        outstandingByPayer[g.payer] -= 1;
         emit Reclaimed(claimAddr, msg.sender, g.paid);
 
         (bool ok,) = msg.sender.call{value: g.paid}("");
@@ -238,6 +254,14 @@ contract SummerGlasses is ERC721, ERC2981, Ownable {
 
     function lockSupply() external onlyOwner {
         supplyLocked = true;
+    }
+
+    /// Cap on how many outstanding gifts one payer may hold at once (0 =
+    /// unlimited). Set this at launch to blunt single-address supply-squatting;
+    /// it only bounds gifts that are still unredeemed, so honest gifters are
+    /// unaffected as their gifts get redeemed.
+    function setMaxGiftsPerPayer(uint256 cap) external onlyOwner {
+        maxGiftsPerPayer = cap;
     }
 
     /// ERC-2981 marketplace royalty. Unset by default; policy is a launch
