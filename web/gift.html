@@ -4,86 +4,71 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Summer in a Glass — buy somebody a drink</title>
+<link rel="stylesheet" href="theme.css">
 <style>
-  /* the photo lives on <html>: a root background is painted across the whole
-     canvas, so it covers the viewport however short or tall the page is —
-     on <body> it would stop where the content stops */
-  html {
-    margin:0; min-height:100%;
+  /* a real glass from the series, warmed down to the aperitivo paper tone so
+     the cards and dark text stay legible over it */
+  html{ margin:0; min-height:100%;
     background:
-      linear-gradient(rgba(246,242,236,.62), rgba(246,242,236,.30) 45%, rgba(246,242,236,.55)),
-      url("summer-glass.jpg") center/cover no-repeat fixed, #b9b6b3;
-  }
-  body {
-    margin:0; min-height:100vh; box-sizing:border-box; background:transparent;
-    font:14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    color:#3a3733; display:grid; place-items:start center; padding:48px 16px;
-  }
+      linear-gradient(rgba(244,235,218,.74), rgba(244,235,218,.56) 45%, rgba(244,235,218,.8)),
+      url("summer-glass.jpg") center/cover no-repeat fixed, var(--paper); }
   @media (max-width:700px){
     /* iOS ignores background-attachment:fixed; scroll it instead of jittering */
-    html { background-attachment:scroll, scroll; }
+    html{ background-attachment:scroll, scroll, scroll; }
   }
-  main { max-width:520px; width:100%; }
-  h1 {
-    font:italic 26px Georgia, serif; font-weight:normal; margin:0 0 6px;
-    text-shadow:0 1px 12px rgba(255,247,235,.9);
+  body{
+    margin:0; min-height:100vh; box-sizing:border-box;
+    display:grid; place-items:start center; padding:52px 16px;
   }
-  .sub { opacity:.8; margin-bottom:24px; text-shadow:0 1px 10px rgba(255,247,235,.85); }
-  .card {
-    background:rgba(255,255,255,.55); backdrop-filter:blur(10px);
-    -webkit-backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,.6);
-    border-radius:14px; box-shadow:0 4px 24px rgba(60,50,40,.18);
-    padding:20px 22px; margin-bottom:16px;
+  main{ max-width:520px; width:100%; }
+  h1{ font-family:var(--serif); font-style:italic; font-weight:400;
+    font-size:clamp(30px,6vw,44px); line-height:1.02; margin:0 0 10px; }
+  .sub{ margin-bottom:26px; font-size:15px; color:var(--ink-soft); }
+  .sub b{ color:var(--ink); }
+  .card{ margin-bottom:16px; }
+  .card b{ font:600 11px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--bitter); }
+  button{
+    font:600 14px var(--sans); padding:12px 20px; cursor:pointer; border-radius:2px;
+    border:1px solid var(--ink); background:transparent; color:var(--ink); transition:transform .14s, box-shadow .14s;
   }
-  button {
-    font:14px inherit; padding:9px 18px; cursor:pointer; border-radius:9px;
-    border:1px solid rgba(120,90,50,.35); background:rgba(255,255,255,.7); color:#3a3733;
+  button:hover:not(:disabled){ transform:translateY(-1px); }
+  button:disabled{ opacity:.4; cursor:default; }
+  button.primary{ background:var(--ink); color:var(--paper); }
+  button.primary:hover:not(:disabled){ box-shadow:0 8px 18px rgba(42,32,26,.26); }
+  .warn{ font-size:12.5px; color:var(--ink-soft); margin-top:10px; }
+  #netnote{
+    font-size:13px; line-height:1.55; padding:12px 15px; border-radius:4px;
+    background:var(--paper-2); border:1px solid rgba(180,120,50,.4);
   }
-  button:disabled { opacity:.45; cursor:default; }
-  button.primary { background:#3a3733; color:#f5f2ee; border-color:#3a3733; }
-  .code {
-    font:15px/1.8 ui-monospace, Menlo, monospace; letter-spacing:.04em;
-    background:rgba(255,255,255,.7); border:1px dashed rgba(120,90,50,.4);
-    border-radius:10px; padding:12px 14px; word-break:break-all; user-select:all;
-  }
-  .warn { font-size:12.5px; opacity:.75; margin-top:10px; }
-  #netnote {
-    font-size:13px; line-height:1.55; padding:11px 14px; border-radius:10px;
-    background:rgba(255,244,224,.75); border:1px solid rgba(180,140,70,.35);
-  }
-  #netnote b { display:block; margin-bottom:2px; }
-  #netnote div { opacity:.78; }
-  #netnote.wrong { background:rgba(255,232,226,.9); border-color:rgba(160,60,45,.45); }
-  textarea#note {
+  #netnote b{ display:block; margin-bottom:2px; letter-spacing:0; text-transform:none;
+    font:600 13px var(--sans); color:var(--ink); }
+  #netnote div{ color:var(--ink-soft); }
+  #netnote.wrong{ background:#F3DED4; border-color:rgba(154,43,34,.5); }
+  #netnote.wrong b{ color:var(--err); }
+  textarea#note{
     width:100%; box-sizing:border-box; margin-top:6px; resize:vertical;
-    font:italic 14px/1.5 Georgia, "Times New Roman", serif;
-    padding:9px 11px; border-radius:9px; border:1px solid rgba(120,90,50,.35);
-    background:rgba(255,255,255,.75); color:#3a3733;
+    font:italic 15px/1.5 var(--serif); padding:10px 12px; border-radius:3px;
+    border:1px solid var(--line); background:var(--paper); color:var(--ink);
   }
-  label.ck { display:flex; gap:8px; align-items:flex-start; margin:14px 0; cursor:pointer; }
-  .muted { opacity:.6; font-size:12.5px; }
-  .err { color:#8c2f2f; }
-  #browse { position:fixed; right:18px; top:16px; z-index:5; }
-  #browse a {
-    display:inline-block; font:13.5px inherit; color:#3a3733; text-decoration:none;
-    padding:8px 14px; border-radius:10px;
-    background:rgba(255,255,255,.62); border:1px solid rgba(255,255,255,.7);
-    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
-    box-shadow:0 2px 10px rgba(60,50,40,.12);
+  textarea#note:focus{ outline:none; border-color:var(--oxblood); }
+  label.ck{ display:flex; gap:8px; align-items:flex-start; margin:14px 0; cursor:pointer; font-size:13px; }
+  #browse{ position:fixed; right:18px; top:16px; z-index:5; }
+  #browse a{
+    display:inline-block; font:600 12px var(--mono); letter-spacing:.06em;
+    text-transform:uppercase; color:var(--ink); text-decoration:none;
+    padding:8px 13px; border-radius:2px; border:1px solid var(--line); background:var(--paper);
   }
-  #browse a:hover { background:rgba(255,255,255,.85); }
+  #browse a:hover{ background:var(--paper-2); }
   @media (max-width:760px){
-    /* on a narrow screen a floating corner link would sit on the title */
-    #browse { position:static; margin:0 0 18px; text-align:center; }
-    body { padding-top:28px; }
+    #browse{ position:static; margin:0 0 18px; text-align:center; }
+    body{ padding-top:30px; }
   }
-  #step-done a {
-    display:inline-block; font:14px inherit; padding:9px 18px; border-radius:9px;
-    border:1px solid rgba(120,90,50,.35); background:rgba(255,255,255,.7);
-    color:#3a3733; text-decoration:none;
+  #step-done a{
+    display:inline-block; font:600 14px var(--sans); padding:12px 20px; border-radius:2px;
+    border:1px solid var(--ink); background:transparent; color:var(--ink); text-decoration:none;
   }
-  #step-done a:hover { background:rgba(255,255,255,.9); }
-  @media print { html, body { background:#fff !important; } }
+  #step-done a:hover{ background:var(--paper-2); }
+  @media print{ html,body{ background:#fff !important; } }
 </style>
 </head>
 <body>
@@ -278,70 +263,81 @@ async function downloadCard(code, link, note){
     const scale = Math.max(W / img.width, H / img.height);
     const dw = img.width * scale, dh = img.height * scale;
     g.drawImage(img, (W - dw)/2, (H - dh)/2, dw, dh);
+    // veil in the aperitivo paper tone so the card matches the site
     const veil = g.createLinearGradient(0, 0, 0, H);
-    veil.addColorStop(0, 'rgba(250,246,240,.86)');
-    veil.addColorStop(0.55, 'rgba(250,246,240,.55)');
-    veil.addColorStop(1, 'rgba(250,246,240,.88)');
+    veil.addColorStop(0, 'rgba(244,235,218,.9)');
+    veil.addColorStop(0.55, 'rgba(244,235,218,.6)');
+    veil.addColorStop(1, 'rgba(244,235,218,.92)');
     g.fillStyle = veil; g.fillRect(0, 0, W, H);
 
+    const SERIF = '"Didot","Bodoni 72","Hoefler Text",Georgia,serif';
+    const SANS = '"Helvetica Neue",Arial,sans-serif';
+    const MONO = '"SF Mono",Menlo,"Courier New",monospace';
+    const INK = '#2A201A', INK_SOFT = '#6A5A4C', OXBLOOD = '#8A2B24';
     g.textAlign = 'center';
-    g.fillStyle = '#3a3733';
-    g.font = 'italic 62px Georgia, "Times New Roman", serif';
+
+    // the masthead, then a hairline rule like the menu
+    g.fillStyle = INK;
+    g.font = `italic 64px ${SERIF}`;
     g.fillText('summer in a glass, for you', W/2, 150);
+    g.strokeStyle = 'rgba(138,43,36,.5)'; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(W/2 - 64, 180); g.lineTo(W/2 + 64, 180); g.stroke();
 
-    g.fillStyle = 'rgba(58,55,51,.72)';
-    g.font = '27px -apple-system, "Helvetica Neue", Arial, sans-serif';
-    g.fillText('a cold glass, on a sunlit table,', W/2, 205);
-    g.fillText('held on the blockchain until you pour it', W/2, 243);
+    g.fillStyle = INK_SOFT;
+    g.font = `25px ${SANS}`;
+    g.fillText('a cold glass, on a sunlit table,', W/2, 226);
+    g.fillText('held on the blockchain until you pour it', W/2, 262);
 
-    // the handwritten part, in the open space above the code
+    // the handwritten message, in the open space above the code
     if(note){
       const size = note.length > 90 ? 34 : 40;
-      g.font = `italic ${size}px Georgia, "Times New Roman", serif`;
+      g.font = `italic ${size}px ${SERIF}`;
       const lines = wrapLines(g, note, W - 380);
       const lead = size * 1.45;
-      const top = 430 - (lines.length - 1) * lead / 2;
-      // a soft wash behind it, so it reads over the bright sun and the glass
+      const top = 434 - (lines.length - 1) * lead / 2;
       const boxH = lines.length * lead + 40;
       const wash = g.createLinearGradient(0, top - boxH/2 - lead, 0, top + boxH/2 + lead);
-      wash.addColorStop(0, 'rgba(252,249,244,0)');
-      wash.addColorStop(0.5, 'rgba(252,249,244,.78)');
-      wash.addColorStop(1, 'rgba(252,249,244,0)');
+      wash.addColorStop(0, 'rgba(244,235,218,0)');
+      wash.addColorStop(0.5, 'rgba(244,235,218,.82)');
+      wash.addColorStop(1, 'rgba(244,235,218,0)');
       g.fillStyle = wash;
       g.fillRect(110, top - boxH/2 - lead, W - 220, boxH + lead*2);
-      g.fillStyle = '#3a3733';
-      g.font = `italic ${size}px Georgia, "Times New Roman", serif`;
+      g.fillStyle = INK;
+      g.font = `italic ${size}px ${SERIF}`;
       lines.forEach((ln, i) => g.fillText(ln, W/2, top + i * lead));
     }
 
+    // 'your gift code' — a spaced mono label in oxblood
+    g.fillStyle = OXBLOOD;
+    g.font = `600 20px ${MONO}`;
+    if('letterSpacing' in g) g.letterSpacing = '4px';
+    g.fillText('YOUR GIFT CODE', W/2, 598);
+    if('letterSpacing' in g) g.letterSpacing = '0px';
+
     // the code, boxed so it reads as the thing to keep
-    g.fillStyle = 'rgba(255,255,255,.72)';
-    roundRect(g, W/2 - 560, 620, 1120, 116, 18); g.fill();
-    g.strokeStyle = 'rgba(120,90,50,.45)'; g.setLineDash([9, 7]); g.lineWidth = 2;
-    roundRect(g, W/2 - 560, 620, 1120, 116, 18); g.stroke(); g.setLineDash([]);
+    g.fillStyle = 'rgba(239,227,205,.92)';
+    roundRect(g, W/2 - 560, 620, 1120, 116, 6); g.fill();
+    g.strokeStyle = 'rgba(138,43,36,.6)'; g.setLineDash([9, 7]); g.lineWidth = 2;
+    roundRect(g, W/2 - 560, 620, 1120, 116, 6); g.stroke(); g.setLineDash([]);
 
-    g.fillStyle = 'rgba(58,55,51,.6)';
-    g.font = '22px -apple-system, "Helvetica Neue", Arial, sans-serif';
-    g.fillText('your gift code', W/2, 600);
-
-    g.fillStyle = '#3a3733';
-    g.font = 'bold 40px ui-monospace, Menlo, "Courier New", monospace';
-    fitText(g, code, W - 180, 40, 'bold', 'ui-monospace, Menlo, "Courier New", monospace');
+    g.fillStyle = INK;
+    g.font = `bold 40px ${MONO}`;
+    fitText(g, code, W - 180, 40, 'bold', MONO);
     g.fillText(code, W/2, 696);
 
-    g.fillStyle = 'rgba(58,55,51,.72)';
-    g.font = '24px -apple-system, "Helvetica Neue", Arial, sans-serif';
+    g.fillStyle = INK_SOFT;
+    g.font = `24px ${SANS}`;
     g.fillText('redeem it at', W/2, 788);
     // Phones run OCR over photos (Live Text / Lens) and turn a URL they can
     // read into a tappable link — so this line is an interface, not decoration.
     // Bigger and near-black to give the recogniser the best possible chance.
-    g.fillStyle = '#2c2925';
-    g.font = '26px ui-monospace, Menlo, "Courier New", monospace';
-    fitText(g, link, W - 140, 26, '', 'ui-monospace, Menlo, "Courier New", monospace');
+    g.fillStyle = INK;
+    g.font = `26px ${MONO}`;
+    fitText(g, link, W - 140, 26, '', MONO);
     g.fillText(link, W/2, 828);
 
-    g.fillStyle = 'rgba(58,55,51,.55)';
-    g.font = '21px -apple-system, "Helvetica Neue", Arial, sans-serif';
+    g.fillStyle = INK_SOFT;
+    g.font = `21px ${SANS}`;
     g.fillText('no wallet and no fees needed — the code is the key', W/2, 868);
 
     // JPEG: a fraction of PNG's size to send around, and the card is a

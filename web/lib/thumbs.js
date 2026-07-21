@@ -11,6 +11,10 @@
 // ---------------------------------------------------------------------------
 
 const DB = 'summer-glasses', STORE = 'thumbs';
+// The cache format has grown over development (jpeg string -> {jpeg,drink} ->
+// {jpeg,drink,glassware}); bumping the version wipes stale entries so the
+// richer labels regenerate.
+const DB_VERSION = 3;
 const BATCH = 5;
 const TIMEOUT_MS = 20000;
 const SIZE = { w: 420, h: 300 };   // render size; CSS scales it down
@@ -19,8 +23,12 @@ let dbp = null;
 function db(){
   if(dbp) return dbp;
   dbp = new Promise((resolve, reject) => {
-    const r = indexedDB.open(DB, 1);
-    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+    const r = indexedDB.open(DB, DB_VERSION);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      if(d.objectStoreNames.contains(STORE)) d.deleteObjectStore(STORE);
+      d.createObjectStore(STORE);
+    };
     r.onsuccess = () => resolve(r.result);
     r.onerror = () => reject(r.error);
   }).catch(() => null);           // private mode / blocked storage: no cache
@@ -36,12 +44,14 @@ async function cacheGet(seed){
   });
 }
 
-async function cachePut(seed, jpeg){
+async function cachePut(seed, rec){
   const d = await db(); if(!d) return;
-  try { d.transaction(STORE, 'readwrite').objectStore(STORE).put(jpeg, seed); } catch {}
+  try { d.transaction(STORE, 'readwrite').objectStore(STORE).put(rec, seed); } catch {}
 }
 
-/// Render one glass offscreen and return a JPEG data URL.
+/// Render one glass offscreen and return { jpeg, drink, glassware }. The
+/// labels are read straight off the render iframe's window.$features
+/// (same-origin srcdoc) — so the gallery names each row without any chain read.
 function capture(html, seed){
   return new Promise((resolve, reject) => {
     const id = seed + ':' + Math.random().toString(36).slice(2);
@@ -65,7 +75,11 @@ function capture(html, seed){
     const onMsg = (e) => {
       const d = e.data;
       if(!d || d.type !== 'summer-glass-snapshot' || d.id !== id) return;
-      d.jpeg ? finish(resolve, d.jpeg) : finish(reject, new Error(d.error || 'snapshot failed'));
+      if(!d.jpeg) return finish(reject, new Error(d.error || 'snapshot failed'));
+      // read the deal's labels before the frame is torn down
+      let drink = null, glassware = null;
+      try { const f = frame.contentWindow?.$features; drink = f?.drink ?? null; glassware = f?.glassware ?? null; } catch {}
+      finish(resolve, { jpeg: d.jpeg, drink, glassware });
     };
     const timer = setTimeout(() => finish(reject, new Error('snapshot timed out')), TIMEOUT_MS);
 
@@ -102,18 +116,19 @@ async function drain(){
   draining = false;
 }
 
-/// Cached-or-rendered JPEG for a glass. `getHtml()` is only called on a miss,
-/// so cached tiles cost no chain reads at all.
+/// Cached-or-rendered { jpeg, drink } for a glass. `getHtml()` is only called
+/// on a miss, so cached tiles cost no chain reads at all. Old caches held just
+/// the jpeg string; those are normalised so upgrades don't need a wipe.
 export function thumbnail(seed, getHtml){
   return new Promise((resolve, reject) => {
     queue.push({
       resolve, reject,
       run: async () => {
         const hit = await cacheGet(seed);
-        if(hit) return hit;
-        const jpeg = await capture(await getHtml(), seed);
-        await cachePut(seed, jpeg);
-        return jpeg;
+        if(hit) return typeof hit === 'string' ? { jpeg: hit, drink: null } : hit;
+        const rec = await capture(await getHtml(), seed);
+        await cachePut(seed, rec);
+        return rec;
       },
     });
     drain();

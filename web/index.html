@@ -4,144 +4,168 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Summer in a Glass</title>
+<link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="sky.css">
 <script src="sky.js"></script>
 <style>
-  body {
-    margin:0; min-height:100vh; background:transparent;
-    font:14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:#3a3733;
-  }
+  html,body{ margin:0; overflow-x:hidden; }
+  body{ min-height:100vh; background:transparent; }  /* the sky (sky.css on <html>) shows behind the list */
+  .wrap{ max-width:1080px; margin:0 auto; padding:0 26px; }
 
-  header { padding:40px 24px 8px; text-align:center; }
-  h1 {
-    font:italic clamp(38px, 7vw, 62px) Georgia, serif; font-weight:normal;
-    margin:0 0 14px; line-height:1.05;
-    text-shadow:0 1px 20px rgba(255,250,240,.9);
+  /* ---- hero: light through a spritz ---- */
+  .hero{
+    position:relative; overflow:hidden; text-align:center; padding:74px 0 96px; color:var(--ink);
+    /* a light, warm wash that fades to transparent at the bottom so the sunset
+       sky (sky.css, behind) shows through — the whole page stays warm and
+       light, so all text can be dark ink, like a printed menu */
+    background:
+      radial-gradient(120% 90% at 26% 6%, rgba(255,246,222,.92), transparent 54%),
+      radial-gradient(90% 80% at 84% 0%, rgba(246,196,120,.5), transparent 55%),
+      linear-gradient(178deg, #FBE7C2 0%, #F7CF97 40%, #F2B77D 70%, rgba(242,183,125,.4) 88%, rgba(242,183,125,0) 100%);
   }
-  #intro {
-    max-width:540px; margin:0 auto 14px; text-align:center;
-    text-shadow:0 1px 12px rgba(255,250,240,.8);
+  .hero .eyebrow{ color:var(--oxblood); margin-bottom:20px; display:block; }
+  h1{
+    font-family:var(--serif); font-weight:400; font-style:italic;
+    font-size:clamp(44px,9vw,100px); line-height:.92; margin:0; letter-spacing:-.01em;
+    text-wrap:balance; text-shadow:0 1px 18px rgba(255,248,232,.6);
   }
-  #intro p { margin:0 0 6px; }
-  #intro p.muted { font-size:13px; }
-  /* the small print on the back of the bottle */
-  #ingredients {
-    margin-top:10px; font:11.5px ui-monospace, Menlo, monospace;
-    letter-spacing:.05em; text-transform:uppercase; opacity:.5;
-  }
-  .muted { opacity:.6; font-size:12.5px; }
-  .err { color:#8c2f2f; }
+  .lede{ max-width:40ch; margin:22px auto 0; font-size:16.5px; line-height:1.6; color:var(--ink); }
+  .lede .fine{ font-size:13.5px; color:var(--ink-soft); }
+  #ways{ margin-top:28px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+  #ways .btn.solid{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+  #ways .btn.ghost{ color:var(--ink); border-color:var(--ink); }
 
-  #find { margin:0 auto; max-width:420px; display:flex; gap:8px; justify-content:center; }
-  input[type=text] {
-    flex:1; min-width:0; font:13px ui-monospace, Menlo, monospace;
-    padding:8px 11px; border-radius:9px; border:1px solid rgba(120,90,50,.35);
-    background:rgba(255,255,255,.6); color:#3a3733;
+  /* ---- the menu ---- */
+  .menu{ padding:48px 0 8px; }
+  .menu-head{
+    display:flex; align-items:baseline; justify-content:space-between; gap:16px;
+    border-bottom:2px solid var(--ink); padding-bottom:10px;
   }
-  button {
-    font:13px inherit; padding:8px 14px; cursor:pointer; border-radius:9px;
-    border:1px solid rgba(120,90,50,.35); background:rgba(255,255,255,.7); color:#3a3733;
-  }
-  #msg { text-align:center; min-height:20px; margin-top:10px; }
-  #foot {
-    max-width:1400px; margin:0 auto; padding:8px 24px 56px; text-align:center;
-  }
-  #foot #sub { margin-bottom:12px; }
-  #ways {
-    margin-top:16px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;
-  }
-  #ways .act {
-    display:inline-block; font:14px inherit; padding:10px 20px; border-radius:10px;
-    text-decoration:none; cursor:pointer; transition:transform .18s ease, box-shadow .18s ease;
-    border:1px solid rgba(120,90,50,.35); background:rgba(255,255,255,.72); color:#3a3733;
-    box-shadow:0 2px 10px rgba(60,50,40,.10);
-  }
-  #ways .act.primary {
-    background:#3a3733; color:#f5f2ee; border-color:#3a3733;
-    box-shadow:0 4px 16px rgba(60,50,40,.28);
-  }
-  #ways .act:hover { transform:translateY(-2px); box-shadow:0 8px 22px rgba(60,50,40,.24); }
+  .menu-head h2{ font-family:var(--serif); font-style:italic; font-weight:400; font-size:29px; margin:0; }
+  .menu-head .eyebrow{ color:var(--ink-soft); }
 
-  #grid {
-    display:grid; gap:18px; padding:22px 24px 60px;
-    grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
-    max-width:1400px; margin:0 auto;
+  /* two columns, like a real menu; rows read left-to-right, newest first */
+  #grid{
+    margin-top:2px; display:grid; grid-template-columns:1fr 1fr;
+    column-gap:52px; position:relative;
   }
-  .tile {
-    position:relative; aspect-ratio:7/5; border-radius:12px; overflow:hidden;
-    background:rgba(255,255,255,.35); border:1px solid rgba(255,255,255,.55);
-    box-shadow:0 4px 18px rgba(60,50,40,.16); cursor:pointer;
-    transition:transform .25s ease, box-shadow .25s ease;
+  #grid::after{  /* a hairline down the middle of the gutter */
+    content:""; position:absolute; top:6px; bottom:6px; left:50%; width:1px;
+    background:var(--line); pointer-events:none;
   }
-  .tile:hover { transform:translateY(-3px); box-shadow:0 10px 28px rgba(60,50,40,.24); }
-  .tile img { width:100%; height:100%; object-fit:cover; display:block; }
-  .tile .label {
-    position:absolute; left:0; right:0; bottom:0; padding:8px 11px;
-    font-size:12px; color:#fff; text-shadow:0 1px 6px rgba(0,0,0,.7);
-    background:linear-gradient(transparent, rgba(0,0,0,.45));
-    display:flex; justify-content:space-between; gap:8px;
+  @media (max-width:720px){
+    #grid{ grid-template-columns:1fr; column-gap:0; }
+    #grid::after{ display:none; }
   }
-  .tile .mine { color:#ffe9b8; }
-  .tile .gesture {
-    position:absolute; left:0; right:0; bottom:30px; padding:0 11px;
-    font:11.5px ui-monospace, Menlo, monospace; color:rgba(255,255,255,.82);
-    text-shadow:0 1px 6px rgba(0,0,0,.75); pointer-events:none;
+  .g-row{
+    display:flex; align-items:center; gap:18px; padding:16px 6px;
+    border-bottom:1px solid var(--line); cursor:pointer; transition:background .18s ease;
   }
-  .tile .gesture .arrow { opacity:.6; }
-  .tile .pending {
-    position:absolute; inset:0; display:grid; place-items:center;
-    font:italic 13px Georgia, serif; opacity:.55;
+  .g-row:hover{ background:var(--paper-2); }
+  .g-num{ font:600 13px var(--mono); color:var(--bitter); width:30px; flex:none; font-variant-numeric:tabular-nums; }
+  .g-thumb{
+    width:60px; height:84px; flex:none; border-radius:5px; overflow:hidden;
+    background:var(--paper-3);
+    box-shadow:0 6px 14px rgba(42,32,26,.16), inset 0 0 0 1px rgba(255,255,255,.4);
+    display:grid; place-items:center;
   }
-  .tile .pending.failed { font-style:normal; font-size:12px; }
+  /* medium crop, zoomed onto the centred glass; --z / --y tune the framing */
+  .g-thumb img{
+    width:100%; height:100%; object-fit:cover; object-position:center var(--y,40%);
+    transform:scale(var(--z,1.3)); transform-origin:center var(--y,40%); display:block;
+  }
+  .g-thumb.loaded{ box-shadow:0 6px 14px rgba(42,32,26,.2); }
+  .g-pending{ font:italic 11px var(--serif); color:var(--ink-soft); opacity:.6; }
+  .g-meta{ min-width:0; flex:1; }
+  .g-name{ font-family:var(--serif); font-style:italic; font-size:21px; line-height:1.1; text-transform:capitalize; }
+  .g-sub{ margin-top:5px; font:11px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink-soft);
+    display:flex; gap:10px; align-items:center; }
+  .g-sub .who .arrow{ opacity:.6; }
+  .g-sub .mine{ color:var(--oxblood); font-weight:600; }
+  .g-sub .mine:not(:empty)::before{ content:"·"; margin-right:10px; opacity:.5; }
+  .ingredients{ text-align:center; margin:28px 0 0; color:var(--ink-soft);
+    font:600 11px var(--mono); letter-spacing:.2em; text-transform:uppercase; }
 
-  /* full-screen live view */
-  #stage { position:fixed; inset:0; z-index:10; display:none; background:#000; }
-  #stage iframe { width:100%; height:100%; border:0; }
-  #close {
-    position:fixed; left:18px; top:16px; z-index:12; font:13px inherit;
-    padding:6px 12px; border-radius:8px; color:rgba(255,255,255,.75);
-    background:rgba(0,0,0,.25); border:0; backdrop-filter:blur(6px);
+  /* ---- footer: count + lookup ---- */
+  #foot{ max-width:1080px; margin:0 auto; padding:44px 26px 60px; text-align:center; }
+  #sub{ margin-bottom:14px; }
+  #find{ margin:0 auto; max-width:440px; display:flex; gap:8px; justify-content:center; }
+  #q{ flex:1; min-width:0; }
+  #go{ font:600 13px var(--sans); padding:11px 18px; border-radius:3px; cursor:pointer;
+    border:1px solid var(--ink); background:transparent; color:var(--ink); }
+  #go:hover{ background:var(--paper-2); }
+  #msg{ text-align:center; min-height:20px; margin-top:12px; }
+
+  /* ---- full-screen live view ---- */
+  #stage{ position:fixed; inset:0; z-index:10; display:none; background:#000; }
+  #stage iframe{ width:100%; height:100%; border:0; }
+  #close{
+    position:fixed; left:18px; top:16px; z-index:12; font:13px var(--sans);
+    padding:7px 13px; border-radius:3px; color:rgba(255,255,255,.8);
+    background:rgba(0,0,0,.3); border:0; cursor:pointer; backdrop-filter:blur(6px);
   }
-  #close:hover { color:#fff; background:rgba(0,0,0,.45); }
-  #stageTag {
+  #close:hover{ color:#fff; background:rgba(0,0,0,.5); }
+  #stageTag{
     position:fixed; left:50%; transform:translateX(-50%); bottom:22px; z-index:12;
-    font:italic 15px Georgia, serif; color:rgba(255,255,255,.9);
+    font:italic 16px var(--serif); color:rgba(255,255,255,.9);
     text-shadow:0 1px 8px rgba(0,0,0,.6); pointer-events:none;
     opacity:0; transition:opacity 1.6s ease;
   }
-  #stageTag.show { opacity:1; }
+  #stageTag.show{ opacity:1; }
+
+  /* ---- narrow screens ---- */
+  @media (max-width:560px){
+    .wrap{ padding:0 18px; }
+    .hero{ padding:54px 0 78px; }
+    h1{ font-size:clamp(36px,13vw,64px); }
+    .lede{ font-size:15.5px; }
+    .menu-head{ flex-wrap:wrap; row-gap:4px; }
+    .menu-head h2{ font-size:25px; }
+    .menu-head .eyebrow{ display:none; }   /* 'newest first' — implied on a phone */
+    .g-row{ gap:14px; padding:14px 2px; }
+    .g-name{ font-size:18px; }
+    #foot{ padding:40px 18px 56px; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1>summer in a glass</h1>
-  <div id="intro">
-    <p>It's summer, it's hot and we all need a break. <br>Let's buy each other drinks
-      and enjoy the quiet life, for a change!</p>
-    <p class="muted">Every drink is a small artwork, poured the moment it is opened,
-       never dealt twice. It is kept
-      whole inside a contract, so it keeps.</p>
-    <p id="ingredients">Ingredients: 100% code, 0% alcohol.</p>
-  </div>
-  <div id="ways">
-    <a class="act primary" href="redeem.html">I have a gift code → pour my glass</a>
-    <a class="act" href="gift.html">buy somebody a drink</a>
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow">A generative drinks list on Base</span>
+    <h1>Summer in a Glass</h1>
+    <p class="lede">It's summer, it's hot and we all need a break. Let's buy each other
+      drinks and enjoy the quiet life, for a change!
+      <br><span class="fine">Every drink is a small artwork, poured the moment it is
+      opened and never dealt twice — kept whole inside a contract, so it keeps.</span></p>
+    <div id="ways">
+      <a class="btn solid" href="redeem.html">I have a gift code</a>
+      <a class="btn ghost" href="gift.html">Buy somebody a drink</a>
+    </div>
   </div>
 </header>
 
-<div id="grid"></div>
+<main class="wrap">
+  <section class="menu">
+    <div class="menu-head">
+      <h2>Poured so far</h2>
+      <span class="eyebrow">newest first</span>
+    </div>
+    <div id="grid"></div>
+    <p class="ingredients">Ingredients — 100% code &middot; 0% alcohol</p>
+  </section>
+</main>
 
 <footer id="foot">
   <div class="muted" id="sub">…</div>
   <div id="find">
-    <input type="text" id="q" placeholder="a glass number, or a wallet address" autocomplete="off" spellcheck="false">
+    <input type="text" id="q" class="field" placeholder="a glass number, or a wallet address" autocomplete="off" spellcheck="false">
     <button id="go">find</button>
   </div>
   <div id="msg" class="muted"></div>
 </footer>
 
 <div id="stage"><iframe id="frame" allow="autoplay"></iframe></div>
-<button id="close" style="display:none">← back to the gallery</button>
+<button id="close" style="display:none">← back to the menu</button>
 <div id="stageTag"></div>
 
 <script src="vendor/sha3.js"></script>
@@ -153,6 +177,28 @@ import { thumbnail } from './lib/thumbs.js';
 
 const $ = id => document.getElementById(id);
 const setMsg = (t, cls = 'muted') => { $('msg').textContent = t; $('msg').className = cls; };
+const titlecase = s => s ? s.replace(/\b\w/g, c => c.toUpperCase()) : s;
+
+// menu names like "Soda in a Tumbler" / "Empty Goblet" from the deal's
+// drink + glassware (shape -> a readable vessel noun)
+const VESSEL = {
+  highball:'tall glass', rocks:'tumbler', shot:'shot glass', barrel:'tumbler',
+  flared:'tumbler', wine:'wine glass', martini:'martini glass', flute:'flute',
+  goblet:'goblet', fishbowl:'fishbowl', alembic:'flask', 'wine bottle':'bottle',
+};
+function vesselOf(glassware){
+  if(!glassware) return null;
+  const crystal = glassware.startsWith('crystal ');
+  const shape = crystal ? glassware.slice(8) : glassware;
+  return (crystal ? 'crystal ' : '') + (VESSEL[shape] || shape);
+}
+function makeName(tokenId, drink, glassware){
+  const vessel = vesselOf(glassware);
+  if(!vessel) return drink ? titlecase(drink) : 'Summer Glass #' + tokenId;
+  if(!drink || drink === 'empty') return 'Empty ' + titlecase(vessel);
+  const art = /^[aeiou]/i.test(vessel) ? 'an' : 'a';
+  return `${titlecase(drink)} in ${art} ${titlecase(vessel)}`;
+}
 
 let highlight = null;   // address whose glasses get marked, from #a=
 
@@ -187,23 +233,24 @@ function close_(){
 $('close').addEventListener('click', close_);
 addEventListener('keydown', e => { if(e.key === 'Escape' && $('stage').style.display === 'block') close_(); });
 
-// ---- the gallery ----------------------------------------------------------
+// ---- the menu -------------------------------------------------------------
 
 function tile(tokenId){
   const el = document.createElement('div');
-  el.className = 'tile';
-  el.innerHTML = `<div class="pending">pouring…</div>
-    <div class="label">
-      <span>Summer Glass #${tokenId}</span>
-      <span class="mine"></span>
-    </div>
-    <div class="gesture"><span class="who"></span></div>`;
+  el.className = 'g-row';
+  el.innerHTML = `
+    <span class="g-num">${String(tokenId).padStart(2, '0')}</span>
+    <div class="g-thumb"><span class="g-pending">pouring…</span></div>
+    <div class="g-meta">
+      <div class="g-name">Summer Glass #${tokenId}</div>
+      <div class="g-sub"><span class="who"></span><span class="mine"></span></div>
+    </div>`;
   el.onclick = () => open_(tokenId);
   return el;
 }
 
-/// Tiles render lazily: a glass is only asked for its portrait once its tile
-/// is near the viewport, and thumbs.js caps how many run at once.
+/// Rows render lazily: a glass is only asked for its portrait once its row is
+/// near the viewport, and thumbs.js caps how many run at once.
 const watcher = new IntersectionObserver((entries) => {
   for(const entry of entries){
     if(!entry.isIntersecting) continue;
@@ -225,17 +272,26 @@ async function fill(el, tokenId){
 
   try {
     const seed = await seedOf(CONFIG, tokenId);
-    const jpeg = await thumbnail(seed, () => fetchHTML(CONFIG, seed));
+    const { jpeg, drink, glassware } = await thumbnail(seed, () => fetchHTML(CONFIG, seed));
+    if(typeof jpeg !== 'string' || !jpeg.startsWith('data:image')) throw new Error('bad thumbnail');
+    const name = makeName(tokenId, drink, glassware);
+    const thumb = el.querySelector('.g-thumb');
     const img = new Image();
+    img.alt = '';
+    // a bad/undecodable jpeg must never show the browser's broken-image icon
+    img.onerror = () => { img.remove(); if(!thumb.querySelector('.g-pending')){
+      const p = document.createElement('span'); p.className = 'g-pending'; p.textContent = 'tap to view'; thumb.appendChild(p); } };
+    img.onload = () => { el.querySelector('.g-pending')?.remove(); thumb.classList.add('loaded'); };
     img.src = jpeg;
-    img.alt = 'Summer Glass #' + tokenId;
-    el.querySelector('.pending')?.remove();
-    el.prepend(img);
+    thumb.appendChild(img);
+    el.querySelector('.g-name').textContent = name;
   } catch(e){
-    const p = el.querySelector('.pending');
-    if(p){ p.textContent = 'tap to view'; p.className = 'pending failed'; }
+    console.warn(`thumbnail #${tokenId} failed:`, e && (e.message || e));
+    let p = el.querySelector('.g-pending');
+    if(!p){ p = document.createElement('span'); p.className = 'g-pending'; el.querySelector('.g-thumb').appendChild(p); }
+    p.textContent = 'tap to view';
+    p.title = 'thumbnail failed: ' + (e && (e.message || e));   // hover to see the reason
   }
-
 }
 
 async function loadGallery(){
@@ -265,12 +321,11 @@ async function lookupAddress(addr){
   try {
     const ids = await tokensOf(CONFIG, addr, (done, total) => setMsg(`checking ${done}/${total}…`));
     if(!ids.length){ setMsg('that address does not hold a glass (yet)', 'err'); return; }
-    setMsg(ids.length === 1 ? 'found it — marked below' : `found ${ids.length}, marked below`);
-    // mark what is already on screen, then bring theirs into view
-    document.querySelectorAll('.tile').forEach(el => {
+    setMsg(ids.length === 1 ? 'found it — marked in the list' : `found ${ids.length}, marked in the list`);
+    document.querySelectorAll('.g-row').forEach(el => {
       if(ids.includes(Number(el.dataset.id))) el.querySelector('.mine').textContent = 'yours';
     });
-    const first = document.querySelector(`.tile[data-id="${ids[0]}"]`);
+    const first = document.querySelector(`.g-row[data-id="${ids[0]}"]`);
     first?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch(e){
     setMsg('lookup failed: ' + e.message, 'err');

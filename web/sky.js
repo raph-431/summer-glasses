@@ -2,9 +2,11 @@
 // <head>, it sets the class before the first paint, so the page never flashes
 // a default background and then changes its mind.
 (function(){
-  var SKIES = ['dawn', 'morning', 'noon', 'afternoon', 'sunset', 'dusk'];
-  var forced = new URLSearchParams(location.search).get('sky');   // for screenshots
-  var sky = (forced && SKIES.indexOf(forced) >= 0)
-    ? forced : SKIES[Math.floor(Math.random() * SKIES.length)];
+  // Always sunset — it's the one that flows out of the gallery's sunset hero
+  // and sits right with the bitter-orange / oxblood palette. (?sky= can force
+  // another for screenshots.)
+  var ALL = ['dawn', 'morning', 'noon', 'afternoon', 'sunset', 'dusk'];
+  var forced = new URLSearchParams(location.search).get('sky');
+  var sky = (forced && ALL.indexOf(forced) >= 0) ? forced : 'sunset';
   document.documentElement.classList.add('sky-' + sky);
 })();
