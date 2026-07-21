@@ -478,7 +478,7 @@ function randomize(){
   set('turb', Math.min(1, liquid.turb*rng(r, 0.7, 1.3)).toFixed(2));
   set('fizz', (liquid.fizz*rng(r, 0.6, 1.3)).toFixed(2));
   const brimful = r() < FULL_ODDS;
-  const fillV = brimful ? rng(r, 0.92, 1.0) : rng(r, 0.25, 0.85);
+  const fillV = brimful ? rng(r, 0.92, 1.0) : rng(r, 0.4, 0.88);
   set('liq', fillV.toFixed(2));
 
   // ice belongs in tumblers holding a cold drink, with at least a half pour —
