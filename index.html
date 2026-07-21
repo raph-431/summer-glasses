@@ -55,7 +55,7 @@
   }
   #err { position:fixed; inset:0; display:none; place-items:center; color:#333; font:14px sans-serif; }
   #legend {
-    display:none; /* haiku parked for now — delete this line to bring it back */
+    /* shown on demand by the corner 'haiku' button / H key, not per deal */
     position:fixed; left:50%; bottom:8%; transform:translateX(-50%);
     z-index:2; max-width:72vw; text-align:center; white-space:pre-line;
     font:italic 17px/1.7 Georgia, "Times New Roman", serif;
@@ -74,6 +74,7 @@
   <button id="shotBtn" title="save this frame as a picture">download</button>
   <button id="infoBtn">info</button>
   <button id="audioBtn">sound on/off</button>
+  <button id="haikuBtn">haiku</button> <!-- dev-only; stripped from the minted build with haiku.js -->
 </div>
 <div id="infoPanel"></div>
 <div id="ui" style="display:none">

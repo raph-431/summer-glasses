@@ -54,22 +54,19 @@ const TIME_LINE = {
 };
 const pickCap = arr => arr[(Math.random()*arr.length)|0];
 let legendTimer = 0;
-function showLegend(){
-  const el  = $('legend');
+// compose a haiku for the glass on the table right now (drink · shade · hour)
+function buildLegend(){
   const liq = $('liquid').value;
-  el.textContent = [
+  $('legend').textContent = [
     pickCap(DRINK_LINE[liq] || DRINK_LINE.water),
     pickCap(SETTING_LINE[$('canopy').value] || SETTING_LINE[0]),
     pickCap(TIME_LINE[$('tod').value] || TIME_LINE.goldenAfternoon),
   ].join('\n');
-  el.classList.add('show');
-  clearTimeout(legendTimer);
-  legendTimer = setTimeout(() => el.classList.remove('show'), 7000);
 }
-// H replays the deal's haiku without recomposing it (unless there is none yet)
+// on demand: compose a fresh haiku for the current glass and fade it in/out
 function revealLegend(){
   const el = $('legend');
-  if(!el.textContent){ showLegend(); return; }
+  buildLegend();
   el.classList.add('show');
   clearTimeout(legendTimer);
   legendTimer = setTimeout(() => el.classList.remove('show'), 7000);
@@ -78,5 +75,9 @@ addEventListener('keydown', e => {
   if(e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if(e.key === 'h' || e.key === 'H') revealLegend();
 });
-window.onDeal = showLegend;
-showLegend();   // caption the opening scene too
+// the corner button does the same as the H key; both live (and are bound) only
+// here, so the minted build — which drops haiku.js and strips the button —
+// never carries a dead control
+$('haikuBtn')?.addEventListener('click', revealLegend);
+window.onDeal = buildLegend;   // keep the text current per deal; never auto-show
+buildLegend();

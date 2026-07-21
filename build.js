@@ -40,6 +40,7 @@ const inline = (html, src) => {
 let html = read('index.html');
 html = html.replace(/<script src="haiku\.js"><\/script>[^\n]*\n/, '');   // dev-only caption layer
 html = html.replace(/<div id="legend"><\/div>\n/, '');                   // its (inert) mount point
+html = html.replace(/\s*<button id="haikuBtn">.*?<\/button>[^\n]*\n/, '\n'); // its corner control
 html = inline(html, 'shaders.js');
 html = inline(html, 'main.js');
 
