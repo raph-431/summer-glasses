@@ -303,7 +303,7 @@ const LIQUIDS = {
   redWine:   { hex:'#7a1622', turb:0.10, n:1.36, fizz:0.00, scat:'#a8323f' },
   rose:      { hex:'#f2c2a4', turb:0.05, n:1.36, fizz:0.00, scat:'#f6d8c2' },
   whiskey:   { hex:'#b05e14', turb:0.02, n:1.36, fizz:0.00, scat:'#d08428' },
-  chartreuse:{ hex:'#bcd12e', turb:0.10, n:1.34, fizz:0.55, scat:'#d6e85a' },
+  chartreuse:{ hex:'#bcd12e', turb:0.10, n:1.34, fizz:0.00, scat:'#d6e85a' },
   blueLagoon:{ hex:'#1e6fd8', turb:0.08, n:1.34, fizz:0.60, scat:'#4a9ae8' },
   icedTea:   { hex:'#8a4514', turb:0.06, n:1.34, fizz:0.00, scat:'#b06a2a' },
   champagne: { hex:'#eedc9a', turb:0.03, n:1.34, fizz:1.35, scat:'#f5ecb4' },
