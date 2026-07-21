@@ -1,5 +1,29 @@
 # Launch runbook — Summer Glasses
 
+## STATUS as of 2026-07-21 — LIVE ON BASE MAINNET
+
+| | |
+|---|---|
+| contract | `0x87e957299624dE48285ff420989749760b58a4A8` (Base, chainId 8453) |
+| owner / deployer | `0xa4Cf6e6bc4264711f107d6fEb60f256Ae0a7055C` (keystore `deployer-base`) |
+| relayer | `0xdA5BDb3Cfd7406dFd873D2E983901C0ADDCe9222` (keystore `relayer-base`) |
+| site | https://summerdrinks.vercel.app (`/api/status` = health check) |
+| params | price 0.002 ETH · stipend 0.00005 ETH · maxSupply 1000 |
+| minted | #1 (real gift→redeem, seed verified against tokenURI) |
+| Sepolia rehearsal | `0x179a7697554a759acbe5d1913346b6687eC7e504` (same art, byte-identical) |
+
+Verified: art payload on mainnet is byte-identical to the rehearsed build;
+the relayer is net-positive per redeem (earns the stipend, spends less on gas).
+
+**Still open, deliberately:**
+- `freezeArt()` — NOT called. Art stays updatable via `UpdateArt.s.sol`.
+- `lockSupply()` — NOT called. maxSupply 1000 remains adjustable.
+- `transferOwnership` — owner is still the local `deployer-base` keystore;
+  move to a hardware wallet before this matters.
+- `setRoyalty` — unset (no royalty), by choice.
+- `setImageBase` — unset, so marketplace cards have no static image.
+
+
 The full path from this repo to a live series on Base. Everything below
 assumes the local stack already passes:
 
