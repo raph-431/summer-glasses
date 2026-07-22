@@ -1406,10 +1406,19 @@ void main(){
       colA *= 1.0 - 0.85*met;                     // the skin blocks it outright
       colA += ghost * fres * (0.14 + 0.22*fp) * (1.0 - met);
       vec3 mirW = mix(vec3(0.25 + 1.4*fres), 1.5*u_metalCol, met);
-      // the hoop mirrored in the wall: intersect the reflected view ray
-      // with its plane and glow by distance to the circle
+      // the FILL hoop (slot 1, duo colour, no caustics): a soft wash plus a
+      // Fresnel-weighted gleam from its side of the void, so the half the
+      // main hoop leaves dark still models the vessel
+      {
+        vec3 toFill = normalize(u_ringC[1] - P);
+        float lam = max(dot(N, toFill), 0.0);
+        colA += u_lightCol[1] * (0.10*lam + 0.32*pow(lam, 3.0)*fres + 0.05*fp*lam)
+              * (1.0 - 0.55*met);
+      }
+      // the hoops mirrored in the wall (main + fill): intersect the
+      // reflected view ray with each plane, glow by distance to the circle
       vec3 rr = reflect(rd, N);
-      for(int k=0;k<1;k++){
+      for(int k=0;k<2;k++){
         vec3 nrm = normalize(cross(u_ringU[k], u_ringV[k]));
         float denom = dot(rr, nrm);
         if(abs(denom) < 1e-4) continue;

@@ -1302,6 +1302,9 @@ function frame(){
   for(let i=0;i<NL;i++){
     const Ri = RING_R[i]*ringRF[i]*maxR;
     const Ai = ringTiltA[i];              // still: no precession for now
+    // slot 1 is the FILL hoop: its bearing always opposes the main hoop's,
+    // so its light lands on whichever side the primary leaves dark
+    const offA = i === 1 ? ringOffA[0] + Math.PI : ringOffA[i];
     const ctl = Math.cos(ringTilt[i]), stl = Math.sin(ringTilt[i]);
     // height: rolled between hanging low beside the bowl and the old safe
     // perch (the ≥25° formula). Low rings light the glass almost side-on —
@@ -1313,9 +1316,9 @@ function frame(){
     const ca = Math.cos(Ai), sa = Math.sin(Ai);
     ringUArr[i*3] = Ri*ca*ctl; ringUArr[i*3+1] = -Ri*stl; ringUArr[i*3+2] = Ri*sa*ctl;
     ringVArr[i*3] = -Ri*sa;    ringVArr[i*3+1] = 0;       ringVArr[i*3+2] = Ri*ca;
-    ringCArr[i*3] = ringOffR[i]*maxR*Math.cos(ringOffA[i]);
+    ringCArr[i*3] = ringOffR[i]*maxR*Math.cos(offA);
     ringCArr[i*3+1] = Hi;
-    ringCArr[i*3+2] = ringOffR[i]*maxR*Math.sin(ringOffA[i]);
+    ringCArr[i*3+2] = ringOffR[i]*maxR*Math.sin(offA);
   }
   // the white inner ring's basis: same construction, small and crooked,
   // centred inside the cavity
@@ -1334,7 +1337,13 @@ function frame(){
     const n = -Math.hypot(...d);                      // FROM tube INTO scene
     dirs[0] = d[0]/n; dirs[1] = d[1]/n; dirs[2] = d[2]/n;
     cols[0] = ringCol[0]; cols[1] = ringCol[1]; cols[2] = ringCol[2];
-    for(let i=3;i<NL*3;i++) cols[i] = 0;
+    // slot 1: the FILL hoop — duo colour, casts NO caustics (no photon
+    // pass reads it); it exists purely to light the vessel from its dark
+    // side in the composite
+    const d1 = [ringCArr[3], ringCArr[4] - 0.5*shape.H, ringCArr[5]];
+    const n1 = -Math.hypot(...d1);
+    dirs[3] = d1[0]/n1; dirs[4] = d1[1]/n1; dirs[5] = d1[2]/n1;
+    cols[3] = bulbCol[0]*0.9; cols[4] = bulbCol[1]*0.9; cols[5] = bulbCol[2]*0.9;
     // slot 2: the distant sun (parallel rays — the photon shader's
     // directional path), burning in the SAME neon colour as the hoop —
     // one hue owns the whole deal, white stays the bulbs' alone
