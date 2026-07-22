@@ -560,17 +560,18 @@ function randomize(){
   set('diamN', Math.round(rng(r, 5, 48)));
   set('disp', rng(r, 0.1, 1.4).toFixed(2));
 
-  // crystal: harder refraction, real fire, water-clear body, deep cuts —
-  // likelier for stemware, like a good cabinet
-  const crystal = r() < (shape.y0 > 0 ? 0.22 : 0.10);
+  // crystal: harder refraction, real fire, deep cuts. EXPERIMENT: half of
+  // ALL bodies are crystal (no stemware bias), and COLOURED crystal is
+  // allowed — the body keeps whatever tint it rolled, so cobalt or amber
+  // crystal with deep cuts is a real deal now
+  const crystal = r() < 0.50;
   isCrystal = crystal;
   glassN = crystal ? rng(r, 1.55, 1.58) : rng(r, 1.50, 1.52);
   if(crystal){
-    set('glassCol', pick(r, ['#f6fbfa', '#f7f7fc', '#f4faf7']));
     set('disp', rng(r, 1.2, 1.9).toFixed(2));
     set('facet', rng(r, 1.1, 2.4).toFixed(2));
-    // (no pattern re-pick: in this experiment crystal keeps whatever
-    // pattern it rolled — only the optics say crystal)
+    // (no pattern re-pick and no water-clear override: only the optics
+    // say crystal)
   }
 
   // A brimful glass — a generous pour right up near the rim — is a deliberate
