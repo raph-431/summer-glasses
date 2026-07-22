@@ -48,6 +48,7 @@ const compProg   = mkProg(QUAD_VS, COMP_FS);
 const brightProg = mkProg(QUAD_VS, BRIGHT_FS);
 const finalProg  = mkProg(QUAD_VS, FINAL_FS);
 const expoProg   = mkProg(QUAD_VS, EXPO_FS);
+const accProg    = mkProg(QUAD_VS, ACC_FS);
 
 const CAUST = 2048, BLUR = 512;
 // texel-density compensation: 4× the texels share the same photon count,
@@ -66,6 +67,11 @@ const CAUST_DECAY = 0.90;            // ~10-frame accumulation window
 // to the same steady state.
 let lightPaint = true;               // L toggles live, for A/B against realism
 let hideGlass = false;               // H: caustics-only study view (paint mode)
+// temporal AA (paint mode): 8-point sub-pixel jitter pattern (px offsets)
+// + the camera memory that decides whether the tripod is still
+const TAA_JIT = [[0.0625,-0.1875],[-0.0625,0.1875],[0.3125,0.0625],[-0.1875,-0.3125],
+                 [-0.3125,0.3125],[-0.4375,-0.0625],[0.1875,0.4375],[0.4375,-0.4375]];
+let prevCam = [0, 0, 0], frameN = 0;
 const PAINT_DECAY = 0.997;
 // auto-exposure servo: the ring's per-deal pose (offset/tilt) changes how
 // many photons survive to the floor, so a fixed gain leaves some deals
@@ -91,22 +97,28 @@ gl.bindVertexArray(vao);
 const U = p => new Proxy({}, { get: (_, n) => gl.getUniformLocation(p, n) });
 const uP = U(photonProg), uF = U(fadeProg), uB = U(blurProg),
       uC = U(compProg), uBr = U(brightProg), uFin = U(finalProg),
-      uE = U(expoProg);
+      uE = U(expoProg), uA = U(accProg);
 
 // the Proxy lookup hides typos (null location = silent no-op), so verify the
 // profile uniforms actually exist in the composite program
 for(const n of ['u_prof','u_H','u_y0','u_stemR','u_footR','u_footH','u_cavY','u_maxR','u_baseR','u_taY'])
   if(gl.getUniformLocation(compProg, n) === null) console.warn('missing uniform in comp:', n);
 
-// screen-sized targets: HDR scene (bloom source) + quarter-res bloom pair
+// screen-sized targets: HDR scene (bloom source), the temporal-AA
+// accumulator pair, + quarter-res bloom pair
 let scene = null, bloomA = null, bloomB = null;
+let accPP = [null, null], accFlip = 0, accN = 0;
 function delTarget(t){ if(t){ gl.deleteFramebuffer(t.fb); gl.deleteTexture(t.tex); } }
 function resize(){
   const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   canvas.width  = Math.floor(innerWidth*dpr);
   canvas.height = Math.floor(innerHeight*dpr);
   delTarget(scene); delTarget(bloomA); delTarget(bloomB);
+  delTarget(accPP[0]); delTarget(accPP[1]);
   scene  = mkTarget(canvas.width, canvas.height);
+  accPP  = [mkTarget(canvas.width, canvas.height),
+            mkTarget(canvas.width, canvas.height)];
+  accN = 0;
   const bw = Math.max(canvas.width >> 2, 1), bh = Math.max(canvas.height >> 2, 1);
   bloomA = mkTarget(bw, bh);
   bloomB = mkTarget(bw, bh);
@@ -1784,17 +1796,40 @@ function frame(){
   const rox = Math.sin(caz)*orbR, roz = Math.cos(caz)*orbR;
   gl.uniform3f(uC.u_ro, rox, ch, roz);
   gl.uniform1f(uC.u_taY, taY);
+  // temporal AA: on the still tripod, jitter the rays by sub-pixel offsets
+  // (8-point pattern) and let the accumulator average the composites —
+  // silhouette stairs converge to filtered edges in ~a dozen frames. Any
+  // camera motion resets the average to the freshest frame.
+  const camNow = [rox, ch, roz];
+  const still = lightPaint
+    && Math.hypot(camNow[0] - prevCam[0], camNow[1] - prevCam[1], camNow[2] - prevCam[2]) < 1e-4;
+  prevCam = camNow;
+  accN = still ? Math.min(accN + 1, 24) : 0;
+  const J = TAA_JIT[(frameN++) & 7];
+  gl.uniform2f(uC.u_jit, still ? J[0]/canvas.width : 0, still ? J[1]/canvas.height : 0);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, caust.tex);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, blurB.tex);
   gl.uniform1i(uC.u_caust, 0);
   gl.uniform1i(uC.u_caustB, 1);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
+  // blend into the accumulator (k=1 passes through when moving/realistic)
+  const acc = accPP[accFlip], accPrev = accPP[1 - accFlip];
+  accFlip = 1 - accFlip;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, acc.fb);
+  gl.useProgram(accProg);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, accPrev.tex);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, scene.tex);
+  gl.uniform1i(uA.u_prev, 0);
+  gl.uniform1i(uA.u_cur, 1);
+  gl.uniform1f(uA.u_k, accN > 0 ? 1/(accN + 1) : 1);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
   // ---- pass 4: bloom — bright pass at quarter res, then separable blur
   gl.useProgram(brightProg);
   gl.bindFramebuffer(gl.FRAMEBUFFER, bloomA.fb);
   gl.viewport(0, 0, bloomA.w, bloomA.h);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, scene.tex);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, acc.tex);
   gl.uniform1i(uBr.u_tex, 0);
   gl.uniform1f(uBr.u_arty, lightPaint ? 1 : 0);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -1813,7 +1848,7 @@ function frame(){
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.useProgram(finalProg);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, scene.tex);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, acc.tex);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bloomA.tex);
   gl.uniform1i(uFin.u_scene, 0);
   gl.uniform1i(uFin.u_bloom, 1);

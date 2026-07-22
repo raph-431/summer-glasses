@@ -947,6 +947,20 @@ void main(){
 }
 `;
 
+// temporal AA accumulator (light painting): the tripod is still, so the
+// composite is re-rendered with sub-pixel ray jitter each frame and
+// averaged here — silhouettes converge to filtered edges the way the
+// caustics converge to smooth lace. u_k = 1 passes through (motion /
+// realistic mode).
+const ACC_FS = `#version 300 es
+precision highp float;
+in vec2 v_uv; out vec4 o;
+uniform sampler2D u_prev;
+uniform sampler2D u_cur;
+uniform float u_k;
+void main(){ o = mix(texture(u_prev, v_uv), texture(u_cur, v_uv), u_k); }
+`;
+
 // bloom bright pass: keep only what outshines the blown-out backdrop
 const BRIGHT_FS = `#version 300 es
 precision highp float;
@@ -1016,10 +1030,8 @@ void main(){
   // the negative: everything above — exposure, bloom, vignette, grain —
   // happens in light space; the flip is purely the print, pulled onto a
   // slightly coloured stock (the tint multiplies, so paper takes the hue
-  // fully while the ink stays near-black). GILDING: metal patches (mask
-  // in the scene alpha, paint mode only) keep their LIT colour — foil
-  // stamped on the print instead of inverting to a ghost of itself.
-  if(u_invert > 0.5) col = mix(u_paperCol*(1.0 - col), col, clamp(sc.a, 0.0, 1.0));
+  // fully while the ink stays near-black)
+  if(u_invert > 0.5) col = u_paperCol*(1.0 - col);
   o = vec4(col, 1.0);
 }
 `;
@@ -1056,6 +1068,7 @@ uniform float u_table;       // 0 stone, 1 wood planks, 2 glazed tiles, 3 concre
 uniform float u_tabRot;      // per-deal spin of the plank direction
 uniform float u_arty;        // 1 = light painting: void + caustic + ghost vessel
 uniform float u_hideG;       // 1 = caustics only: no ghost, no bulbs (H key)
+uniform vec2  u_jit;         // sub-pixel ray jitter (temporal AA, uv units)
 uniform vec3  u_ringC[3];    // neon rings: centres
 uniform vec3  u_ringU[3];    // neon rings: tilted basis × radius (dipping axis)
 uniform vec3  u_ringV[3];    // neon rings: tilted basis × radius (level axis)
@@ -1289,7 +1302,9 @@ vec3 shadeIce(vec3 Q, vec3 dd){
 }
 
 void main(){
-  vec2 frag = (v_uv*2.0 - 1.0) * vec2(u_res.x/u_res.y, 1.0);
+  // u_jit: sub-pixel ray offset for the temporal AA accumulator (zero
+  // outside light painting)
+  vec2 frag = ((v_uv + u_jit)*2.0 - 1.0) * vec2(u_res.x/u_res.y, 1.0);
 
   // orbit camera
   vec3 ro = u_ro;
@@ -1373,10 +1388,6 @@ void main(){
     // sampled first so it glows straight through the ghost.
     vec3 colA = vec3(0.0);
     float hitA = 30.0;
-    float metVis = 0.0;   // metal seen at this pixel — rides the output
-                          // alpha (DoF, its old tenant, is off in paint
-                          // mode) so the print pass can gild instead of
-                          // inverting it
     if(tTable < 1e4){
       hitA = tTable;
       vec3 P = ro + rd*tTable;
@@ -1441,7 +1452,6 @@ void main(){
       // the pool stops shining through and every light mirrors at full
       // strength in the metal's colour, not just at grazing angles
       float met = metalAt(P);
-      metVis = met;
       colA *= 1.0 - 0.35*fres;                    // the rim dims the pool behind
       colA *= 1.0 - 0.85*met;                     // the skin blocks it outright
       colA += ghost * fres * (0.14 + 0.22*fp) * (1.0 - met);
@@ -1515,7 +1525,7 @@ void main(){
       colA += u_bulbCol * 1.80 * g;
       if(g > 0.5) hitA = min(hitA, tk);           // the bulbs hold focus
     }
-    o = vec4(colA, metVis);   // alpha = metal mask (paint mode has no DoF)
+    o = vec4(colA, hitA);
     return;
   }
 
