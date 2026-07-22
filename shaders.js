@@ -1375,6 +1375,11 @@ void main(){
             colA = mix(colA, lensC, bot);
           }
         }
+        // ...plus the glow-floor whisper: a faint ember in the deal's own
+        // hue, striated like blown glass, so no bottom ever reads as a
+        // pure void even when the bent ray lands in darkness
+        colA += u_lightCol[0] * exp(-0.4*u_glassSig)
+              * (0.020 + 0.022*fbm(P.xz*14.0 + 3.7)) * bot;
       }
       float fres = pow(clamp(1.0 + dot(rd, N), 0.0, 1.0), 3.0);
       float fp = facetPattern(atan(P.z, P.x), clamp(P.y, 0.0, u_H));
