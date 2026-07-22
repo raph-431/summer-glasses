@@ -1586,47 +1586,6 @@ function buildAudio(){
   }
   setTimeout(stringSwell, 15000 + Math.random()*20000);
 
-  // PLUCKS: Karplus-Strong — a noise burst ringing in a damped feedback
-  // delay, the one genuinely string-like sound cheap synthesis can make.
-  // A rare one-to-three note answer between motifs. The loop is a real
-  // cycle, so it's strangled and disconnected after it rings out.
-  function pluck(){
-    if(ctx.state === 'running' && xtalState.on && Math.random() < 0.65){
-      let t0 = ctx.currentTime + 0.05;
-      const n = 1 + (Math.random()*3 | 0);
-      const reg = singF < 560 ? 2 : 1;
-      let pan0 = Math.random()*1.2 - 0.6;
-      for(let i = 0; i < n; i++){
-        const f = singF*reg*BELL_STEPS[Math.random()*BELL_STEPS.length|0];
-        const bl = (ctx.sampleRate*0.006) | 0;
-        const bb = ctx.createBuffer(1, bl, ctx.sampleRate);
-        const bd = bb.getChannelData(0);
-        for(let k = 0; k < bl; k++) bd[k] = Math.random()*2 - 1;
-        const burst = ctx.createBufferSource(); burst.buffer = bb;
-        const loop = ctx.createDelay(0.05); loop.delayTime.value = 1/f;
-        const fb = ctx.createGain(); fb.gain.value = 0.986;
-        const damp = ctx.createBiquadFilter();
-        damp.type = 'lowpass'; damp.frequency.value = 2600 + Math.random()*2400;
-        const out = ctx.createGain(); out.gain.value = 0.16;
-        const pan = ctx.createStereoPanner();
-        pan.pan.value = Math.min(Math.max(pan0 + i*0.18, -1), 1);
-        burst.connect(loop);
-        loop.connect(damp); damp.connect(fb); fb.connect(loop);
-        loop.connect(out); out.connect(pan); pan.connect(xtal);
-        burst.start(t0);
-        fb.gain.setTargetAtTime(0.5, t0 + 2.5, 0.4);   // let the string die
-        out.gain.setTargetAtTime(0, t0 + 3.5, 0.5);
-        setTimeout(() => {
-          try{ out.disconnect(); pan.disconnect(); loop.disconnect();
-               damp.disconnect(); fb.disconnect(); }catch(e){}
-        }, 12000);
-        t0 += 0.4 + Math.random()*0.5;
-      }
-    }
-    setTimeout(pluck, 25000 + Math.random()*45000);
-  }
-  setTimeout(pluck, 12000 + Math.random()*15000);
-
   // SHARD CASCADE: every few minutes, a handful of tiny strikes tumbling
   // down a broken ladder — the memory of breakage, never the crash
   function shardCascade(){
