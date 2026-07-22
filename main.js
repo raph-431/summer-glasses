@@ -1330,7 +1330,7 @@ function buildAudio(){
   // finger circling) + the wine glass's inharmonic 2.32 partial. The render
   // loop tunes it to the dealt glass — big bowls sing low.
   let singF = 880;
-  const singG = ctx.createGain(); singG.gain.value = 0.16; singG.connect(xtal);
+  const singG = ctx.createGain(); singG.gain.value = 0.10; singG.connect(xtal);
   const swell = ctx.createGain(); swell.gain.value = 0.55;   // breathes below
   const sLfo = ctx.createOscillator(); sLfo.frequency.value = 0.09;
   const sLfoG = ctx.createGain(); sLfoG.gain.value = 0.38;
@@ -1803,7 +1803,7 @@ function frame(){
       AU.criG.gain.setTargetAtTime(0, now, 0.8);
       AU.birdG.gain.setTargetAtTime(0, now, 0.8);
       AU.xtal.gain.setTargetAtTime(0.9, now, 1.0);
-      AU.sing(Math.min(Math.max(1000 - 1200*maxR, 250), 880));
+      AU.sing(Math.min(Math.max(1400 - 1650*maxR, 340), 1250));
       // the deal facts the crystal voices are honest about
       AU.xtalState.cond = cond;
       AU.xtalState.crystal = isCrystal;
