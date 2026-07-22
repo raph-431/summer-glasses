@@ -1056,11 +1056,6 @@ uniform float u_arty;        // 1 = light painting: void + caustic + ghost vesse
 uniform vec3  u_ringC[3];    // neon rings: centres
 uniform vec3  u_ringU[3];    // neon rings: tilted basis × radius (dipping axis)
 uniform vec3  u_ringV[3];    // neon rings: tilted basis × radius (level axis)
-uniform float u_hOn;         // handle (light painting only): 0 off, 1 on
-uniform float u_hAz;         // handle azimuth on the wall
-uniform vec2  u_hC;          // handle arc centre: (radial, height) in its plane
-uniform float u_hR;          // handle arc radius
-uniform float u_hT;          // handle tube radius
 uniform vec3  u_ringWC;      // white bulb string inside the glass: its circle
 uniform vec3  u_ringWU;
 uniform vec3  u_ringWV;
@@ -1119,25 +1114,7 @@ float sdGlass(vec3 p){
   float ri = innerR(th, yc);
   float fRB = clamp(ri*0.45, 0.02, 0.09);
   float dCav = roundedIntersect(r - ri, u_cavY - p.y, fRB);
-  float dAll = roundedIntersect(d, -dCav, rcT*0.8);
-  if(u_hOn > 0.5){
-    // HANDLE (light painting only): a capped-torus arc rooted through the
-    // wall. Optically silent — the photon tracer never sees sdGlass — but
-    // it reflects the hoops, wears the metal skin (world-space noise) and
-    // catches the diamond fire like the rest of the ghost. The angular
-    // clamp runs past ±90° so the tube's ends dive INTO the wall; the
-    // smooth union blends the roots over the facet pattern.
-    float ca = cos(u_hAz), sa = sin(u_hAz);
-    vec2 pr = vec2(ca*p.x + sa*p.z, -sa*p.x + ca*p.z);   // (radial', out-of-plane)
-    vec2 q = vec2(pr.x - u_hC.x, p.y - u_hC.y);
-    float ang = clamp(atan(q.y, q.x), -1.9, 1.9);
-    vec2 apt = u_hR*vec2(cos(ang), sin(ang));
-    float dh = length(vec3(q - apt, pr.y)) - u_hT;
-    float kk = 0.03;
-    float hb = clamp(0.5 + 0.5*(dAll - dh)/kk, 0.0, 1.0);
-    dAll = mix(dAll, dh, hb) - kk*hb*(1.0 - hb);
-  }
-  return dAll;
+  return roundedIntersect(d, -dCav, rcT*0.8);
 }
 vec3 glassNormal(vec3 p){
   const vec2 e = vec2(0.004, 0.0);
@@ -1322,8 +1299,7 @@ void main(){
   // does this ray meet the glass? (bounding cylinder first)
   float tGlass = -1.0;
   {
-    float rb = u_maxR + 0.06
-             + (u_hOn > 0.5 ? max(u_hC.x + u_hR + u_hT - u_maxR, 0.0) : 0.0);
+    float rb = u_maxR + 0.06;
     float a = dot(rd.xz, rd.xz);
     float b = 2.0*dot(ro.xz, rd.xz);
     float c = dot(ro.xz, ro.xz) - rb*rb;
