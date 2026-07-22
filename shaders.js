@@ -1386,7 +1386,7 @@ void main(){
     }
     // H key: study view — the pool alone, vessel and bulbs dismissed
     float tG = (tGlass > 0.0 && u_hideG < 0.5) ? tGlass : 1e5;
-    if(tLiq < tG && tLiq < 1e4){
+    if(tLiq < tG && tLiq < 1e4 && u_hideG < 0.5){
       // looking down onto the open surface: a dim ember disc, the pool
       // shimmering faintly beneath it
       hitA = min(hitA, tLiq);
