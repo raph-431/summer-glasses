@@ -1882,8 +1882,8 @@ function frame(){
       };
       // thresholds set for ~2/3 presence — silences still happen, but as
       // pauses for breath rather than long absences
-      AU.singG.gain.setTargetAtTime(0.05*ss(-0.15, 0.35, snz(t*0.023, 41.0)), now, 1.5);
-      AU.sing2G.gain.setTargetAtTime(0.04*ss(-0.10, 0.38, snz(t*0.019, 63.0)), now, 1.7);
+      AU.singG.gain.setTargetAtTime(0.035*ss(-0.15, 0.35, snz(t*0.023, 41.0)), now, 1.5);
+      AU.sing2G.gain.setTargetAtTime(0.028*ss(-0.10, 0.38, snz(t*0.019, 63.0)), now, 1.7);
       AU.subG.gain.setTargetAtTime(0.045*ss(-0.28, 0.28, snz(t*0.011, 87.0)), now, 2.5);
       // the deal facts the crystal voices are honest about
       AU.xtalState.cond = cond;
