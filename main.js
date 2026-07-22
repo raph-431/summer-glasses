@@ -1314,7 +1314,74 @@ function buildAudio(){
   }
   birdChirp();
 
-  return { ctx, master, rustle, cicG, criG, birdG };
+  // ---- crystal voices: the cicadas' pendant for the light painting ------
+  // Crossfaded against the courtyard mix by the render loop when L flips.
+  const xtal = ctx.createGain(); xtal.gain.value = 0; xtal.connect(master);
+  const xtalState = { on: false };
+
+  // a whisper of shimmer: struck bells echo into the void once or twice
+  const shimmer = ctx.createDelay(1.0); shimmer.delayTime.value = 0.31;
+  const shimFb = ctx.createGain(); shimFb.gain.value = 0.34;
+  const shimMix = ctx.createGain(); shimMix.gain.value = 0.5;
+  shimmer.connect(shimFb); shimFb.connect(shimmer);
+  shimmer.connect(shimMix); shimMix.connect(xtal);
+
+  // the SINGING RIM: fundamental + a whisker of detune (the beating IS the
+  // finger circling) + the wine glass's inharmonic 2.32 partial. The render
+  // loop tunes it to the dealt glass — big bowls sing low.
+  let singF = 880;
+  const singG = ctx.createGain(); singG.gain.value = 0.16; singG.connect(xtal);
+  const swell = ctx.createGain(); swell.gain.value = 0.55;   // breathes below
+  const sLfo = ctx.createOscillator(); sLfo.frequency.value = 0.09;
+  const sLfoG = ctx.createGain(); sLfoG.gain.value = 0.38;
+  sLfo.connect(sLfoG); sLfoG.connect(swell.gain); sLfo.start();
+  swell.connect(singG);
+  const singOsc = [];
+  for(const [ratio, lvl] of [[1, 0.55], [1.0045, 0.40], [2.32, 0.055]]){
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.value = singF*ratio;
+    const g = ctx.createGain(); g.gain.value = lvl;
+    o.connect(g); g.connect(swell); o.start();
+    singOsc.push({ o, ratio });
+  }
+
+  // STRUCK CRYSTAL: random bell hits with wine-glass partials (inharmonic
+  // 2.32 / 4.25 / 6.63), pitched on a pentatonic-ish ladder above the rim
+  // note so the chimes always agree with the singing
+  const bellG = ctx.createGain(); bellG.gain.value = 1.0;
+  bellG.connect(xtal); bellG.connect(shimmer);
+  const BELL_STEPS = [1, 1.125, 1.333, 1.5, 1.688, 2, 2.25];
+  function bellStrike(){
+    if(ctx.state === 'running' && xtalState.on){
+      const t0 = ctx.currentTime + 0.03;
+      const f = singF*BELL_STEPS[Math.random()*BELL_STEPS.length|0]
+              *(Math.random() < 0.35 ? 2 : 1);
+      const vel = 0.25 + Math.random()*0.75;
+      const pan = ctx.createStereoPanner(); pan.pan.value = Math.random()*1.6 - 0.8;
+      pan.connect(bellG);
+      for(const [ratio, g0, dec] of [[1, 1.0, 2.6], [2.32, 0.42, 1.5],
+                                     [4.25, 0.16, 0.8], [6.63, 0.07, 0.45]]){
+        const o = ctx.createOscillator(); o.type = 'sine';
+        o.frequency.value = f*ratio*(1 + (Math.random() - 0.5)*0.003);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(vel*g0*0.10, t0 + 0.006);
+        g.gain.exponentialRampToValueAtTime(1e-4, t0 + dec*(0.8 + Math.random()*0.4));
+        o.connect(g); g.connect(pan);
+        o.start(t0); o.stop(t0 + dec*1.3 + 0.2);
+      }
+    }
+    setTimeout(bellStrike, 900 + Math.random()*4200);
+  }
+  bellStrike();
+
+  const sing = f => {
+    singF = f;
+    for(const s of singOsc)
+      s.o.frequency.setTargetAtTime(f*s.ratio, ctx.currentTime, 0.4);
+  };
+
+  return { ctx, master, rustle, cicG, criG, birdG, xtal, xtalState, sing };
 }
 // auto-orbit: a slow lap of the glass (~60 s per revolution). It nudges
 // the same smoothed target the mouse drags, so grabbing the canvas
@@ -1603,10 +1670,24 @@ function frame(){
   // cicada / cricket / bird mix crossfades with the time-of-day preset
   if(AU && audioBtn.classList.contains('on')){
     const now = AU.ctx.currentTime;
-    AU.rustle.gain.setTargetAtTime(0.030*wind*(0.4 + 0.8*gust), now, 0.15);
-    AU.cicG.gain.setTargetAtTime(T.amb.cic, now, 1.2);
-    AU.criG.gain.setTargetAtTime(T.amb.cri, now, 1.2);
-    AU.birdG.gain.setTargetAtTime(T.amb.bird, now, 1.2);
+    if(lightPaint){
+      // the void has no cicadas: crystal bells + the glass's own note.
+      // The rim pitch follows the dealt glass — big bowls sing low.
+      AU.xtalState.on = true;
+      AU.rustle.gain.setTargetAtTime(0, now, 0.4);
+      AU.cicG.gain.setTargetAtTime(0, now, 0.8);
+      AU.criG.gain.setTargetAtTime(0, now, 0.8);
+      AU.birdG.gain.setTargetAtTime(0, now, 0.8);
+      AU.xtal.gain.setTargetAtTime(0.9, now, 1.0);
+      AU.sing(Math.min(Math.max(1400 - 1650*maxR, 340), 1250));
+    } else {
+      AU.xtalState.on = false;
+      AU.xtal.gain.setTargetAtTime(0, now, 0.6);
+      AU.rustle.gain.setTargetAtTime(0.030*wind*(0.4 + 0.8*gust), now, 0.15);
+      AU.cicG.gain.setTargetAtTime(T.amb.cic, now, 1.2);
+      AU.criG.gain.setTargetAtTime(T.amb.cri, now, 1.2);
+      AU.birdG.gain.setTargetAtTime(T.amb.bird, now, 1.2);
+    }
   }
 
   // ---- pass 1: trace photons into the caustic accumulation buffer.
