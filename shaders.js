@@ -1515,9 +1515,15 @@ void main(){
     // paper-sky gradient (negatives only): emit a rising wash of the
     // COMPANION's light into the empty sky — the print renders it as the
     // accent ink deepening from bare paper at the horizon toward the top
-    // of the page. Lit deals keep their black void.
-    if(u_neg > 0.5 && tTable > 1e4){
-      colA += u_bulbCol * (smoothstep(0.0, 0.55, rd.y) * 0.30);
+    // of the page.
+    // Its lit pendant: the mirror transform — a faint companion-hued glow
+    // HUGGING the horizon, dying into the void by ~25° up, like distant
+    // neon hazing the bottom of a night sky. Restrained on purpose: it
+    // peaks well under the bloom knee so it reads as atmosphere, not a
+    // halation stripe, and the zenith stays true black.
+    if(tTable > 1e4){
+      if(u_neg > 0.5) colA += u_bulbCol * (smoothstep(0.0, 0.55, rd.y) * 0.30);
+      else colA += u_bulbCol * ((1.0 - smoothstep(0.0, 0.42, rd.y)) * 0.085);
     }
 
     // the bulbs, seen directly: hot points hanging in the vessel.
