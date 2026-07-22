@@ -711,16 +711,12 @@ const PAPER_TRIALS = [
   { h:[0.35,0.65,1.10], d:[1.10,0.15,0.20], p:2, n:'tan + cyan on blue-grey' },
   { h:[1.05,0.60,0.45], d:[0.15,0.95,0.75], p:3, n:'slate + crimson on rose' },
 ];
-const PAPER_FOR = [
-  [3, 0, 2],   // magenta    → green ink:      rose / cream / blue-grey
-  [0, 1, 5],   // cyan       → flame ink:      cream / ivory / kraft
-  [2, 3],      // amber      → blue ink:       blue-grey / rose
-  [0, 3, 2],   // acid green → magenta ink:    cream / rose / blue-grey
-  [0, 1, 2],   // red-orange → teal ink:       cream / ivory / blue-grey
-  [2, 5, 0],   // violet     → chartreuse ink: blue-grey / kraft / cream
-  [0, 1, 5],   // ice blue   → tan ink:        cream / ivory / kraft
-  [0, 3, 2],   // pink       → jade ink:       cream / rose / blue-grey
-];
+// the GRADUATED print palette: the 13 trial combos rapha kept (2026-07-22
+// review on combos.html). A negative deal rolls one of these whole —
+// hoop+sun light, companion light, stock — instead of deriving its inks
+// from the neon wheel. PAPER_TRIALS stays intact so #ptrial / combos.html
+// keep working for future auditions.
+const PRINTS = [0, 1, 4, 5, 6, 7, 8, 9, 11, 12, 14, 18, 19].map(i => PAPER_TRIALS[i]);
 const METALS = [[0.92, 0.94, 0.98],   // silver
                 [1.00, 0.78, 0.38],   // gold
                 [0.98, 0.55, 0.38]];  // copper
@@ -934,10 +930,15 @@ function randomize(){
   ringOffR[0] = Math.min(ringOffR[0], RING_R[0]*ringRF[0] - 1.25);
   const hoopIdx = Math.floor(r()*NEONS.length);
   ringCol = NEONS[hoopIdx];
-  paperCol = PAPERS[pick(r, PAPER_FOR[hoopIdx])];   // stock suits the ink
-  // violet prints as chartreuse-green ink beside its companion's blue —
-  // the one ink pairing that never worked. Violet deals stay lit.
-  if(hoopIdx === 5) inverted = false;
+  // a negative deal swaps the whole colour system for one graduated print
+  // combo; lit deals keep the neon wheel (the old per-hue paper table and
+  // the violet exclusion retired with this)
+  let printPick = null;
+  if(inverted){
+    printPick = PRINTS[Math.floor(r()*PRINTS.length)];
+    ringCol = printPick.h;
+    paperCol = PAPERS[printPick.p];
+  }
   paintSunAz = r()*6.2832;
   paintSunEl = rng(r, 0.26, 1.05);     // 15°–60°: low rakes to high noon-ish,
                                        // always steep enough to land a fan
@@ -949,7 +950,7 @@ function randomize(){
   metalWarp = rng(r, 0.0, 2.2);        // 0 round blobs .. stringy splatter
   metalType = Math.floor(r()*4);       // bands / splashes / spots / filaments
   // the lone bulb wears the hoop's curated duo colour (metals stay metals)
-  bulbCol = DUOS[hoopIdx];
+  bulbCol = printPick ? printPick.d : DUOS[hoopIdx];
   // dev override: #ptrial=N prints this deal with trial N's combo,
   // whatever else was rolled. Placed AFTER every colour assignment it
   // overrides (ringCol, bulbCol via DUOS, paper); consumes no rng, so
@@ -996,6 +997,7 @@ function randomize(){
     table:     selText('table'),
     ice:       +$('ice').value,
   };
+  if(printPick) window.$features.print = printPick.n;   // negative-deal ink combo
   window.onDeal?.();   // optional hook — haiku.js captions the deal if loaded
   if(infoPanel.style.display === 'block') fillInfo();
 }
