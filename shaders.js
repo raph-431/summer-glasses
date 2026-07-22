@@ -1408,7 +1408,9 @@ void main(){
     // glass, lets it through.
     if(tTable > 1e4){
       float sa = max(dot(rd, -u_lightDir[2]), 0.0);
-      colA += u_lightCol[2] * (pow(sa, 6000.0)*10.0 + pow(sa, 300.0)*1.2 + pow(sa, 40.0)*0.10);
+      // theatrical: a fat ~3° disc, a generous inner halo, and a broad
+      // atmosphere-wide bleed — poster sunset, not astronomy
+      colA += u_lightCol[2] * (pow(sa, 900.0)*14.0 + pow(sa, 90.0)*1.6 + pow(sa, 12.0)*0.15);
     }
 
     // the bulbs, seen directly: hot points hanging in the vessel.
