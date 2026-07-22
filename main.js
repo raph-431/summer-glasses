@@ -634,11 +634,8 @@ function randomize(){
   const hoopIdx = Math.floor(r()*NEONS.length);
   ringCol = NEONS[hoopIdx];
   paintSunAz = r()*6.2832;
-  paintSunEl = rng(r, 0.0, 0.85);      // 0°–49°: down to sitting ON the
-                                       // horizon — near zero the disc still
-                                       // burns but its rays arrive too flat
-                                       // to land much caustic (photons that
-                                       // exit near-horizontal are culled)
+  paintSunEl = rng(r, 0.26, 1.05);     // 15°–60°: low rakes to high noon-ish,
+                                       // always steep enough to land a fan
   // splashed metal: nearly every deal wears some
   metal = r() < 0.95 ? rng(r, 0.15, 0.65) : 0;
   metalSeed = r()*100;

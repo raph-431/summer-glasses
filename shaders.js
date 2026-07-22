@@ -1402,16 +1402,8 @@ void main(){
       vec3 hs = reflect(u_lightDir[2], N);
       colA += u_lightCol[2] * pow(max(dot(hs, -rd), 0.0), 200.0) * (3.0*(1.0 - met) + 2.5*met) * mix(vec3(1.0), u_metalCol, met);
     }
-    // the distant sun, made visible: a hard disc with a tight halo hanging
-    // in the void exactly where its parallel rays come from, in the deal's
-    // own hue. The table hides it below the horizon; the ghost, being
-    // glass, lets it through.
-    if(tTable > 1e4){
-      float sa = max(dot(rd, -u_lightDir[2]), 0.0);
-      // theatrical: a fat ~3° disc, a generous inner halo, and a broad
-      // atmosphere-wide bleed — poster sunset, not astronomy
-      colA += u_lightCol[2] * (pow(sa, 900.0)*14.0 + pow(sa, 90.0)*1.6 + pow(sa, 12.0)*0.15);
-    }
+    // (the sun is unseen again — only its light: the fan, the arc and the
+    // facet glint. The bulb stays the one light you can look at.)
 
     // the bulbs, seen directly: hot points hanging in the vessel.
     // Deliberately unphysical: they draw over the ghost and through the wall.
