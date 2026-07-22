@@ -645,6 +645,17 @@ const NEONS = [
   [0.55, 0.25, 1.10],   // violet
   [0.35, 0.65, 1.10],   // ice blue
   [1.05, 0.45, 0.75],   // pink
+  // graduated light-trial pairs (2026-07-22 review, combos.html?mode=light)
+  [1.15, 1.12, 1.05],   // white         (+ hot pink)
+  [1.20, 0.90, 0.25],   // gold          (+ cobalt)
+  [1.20, 0.45, 0.35],   // coral         (+ aqua)
+  [0.55, 1.10, 0.75],   // mint          (+ rose)
+  [1.25, 0.10, 0.12],   // blood red     (+ ice)
+  [1.20, 0.65, 0.45],   // peach         (+ periwinkle)
+  [1.25, 0.30, 0.10],   // vermilion     (+ cobalt)
+  [1.25, 0.55, 0.10],   // sunset orange (+ magenta)
+  [0.10, 0.90, 0.80],   // teal          (+ copper)
+  [0.80, 0.90, 1.15],   // ice           (+ blood red)
 ];
 let ringCol = NEONS[0];
 // curated companion per NEONS entry (by index): the LONE BULB wears the
@@ -659,6 +670,17 @@ const DUOS = [
   [1.05, 0.52, 0.10],   // violet     → warm orange
   [1.05, 0.45, 0.75],   // ice blue   → pink
   [0.10, 0.85, 1.05],   // pink       → cyan
+  // companions of the graduated light-trial pairs (same indices as NEONS)
+  [1.15, 0.20, 0.60],   // white         → hot pink
+  [0.25, 0.45, 1.30],   // gold          → cobalt
+  [0.15, 0.95, 0.90],   // coral         → aqua
+  [1.15, 0.45, 0.55],   // mint          → rose
+  [0.80, 0.90, 1.15],   // blood red     → ice
+  [0.55, 0.60, 1.20],   // peach         → periwinkle
+  [0.25, 0.45, 1.30],   // vermilion     → cobalt
+  [1.05, 0.12, 0.62],   // sunset orange → magenta
+  [1.15, 0.55, 0.30],   // teal          → copper
+  [1.25, 0.10, 0.12],   // ice           → blood red
 ];
 // a bare distant sun over the void (slot 2): classical parallel-ray caustic
 // cutting across the hoop's mandala. Warm white; pose rolled per deal.
