@@ -1371,30 +1371,53 @@ function buildAudio(){
   const bellG = ctx.createGain(); bellG.gain.value = 1.0;
   bellG.connect(xtal); bellG.connect(shimmer);
   const BELL_STEPS = [1, 1.125, 1.333, 1.5, 1.688, 2, 2.25];
+  // a FAMILY of strikes, not one sound: each kind has its own partial
+  // recipe, attack and decay character. w = pick weight.
+  const BELL_KINDS = [
+    // the classic strike
+    { w: 3.0, atk: 0.006, decM: 1.0,
+      parts: [[1, 1.0, 2.6], [2.32, 0.42, 1.5], [4.25, 0.16, 0.8], [6.63, 0.07, 0.45]] },
+    // dry tap: short, bright, gone
+    { w: 2.0, atk: 0.004, decM: 0.35,
+      parts: [[1, 0.9, 0.9], [2.32, 0.50, 0.5], [4.25, 0.30, 0.3], [9.1, 0.08, 0.15]] },
+    // long bloom: near-harmonic partials, sings for seconds
+    { w: 2.0, atk: 0.012, decM: 2.2,
+      parts: [[1, 1.0, 4.5], [2.0, 0.18, 3.5], [2.32, 0.30, 2.6], [3.0, 0.05, 2.0]] },
+    // deep bowl: a sub-octave under the strike, gong-ish
+    { w: 1.5, atk: 0.020, decM: 1.4,
+      parts: [[0.5, 0.50, 3.0], [1, 0.80, 2.4], [1.19, 0.25, 1.4], [2.32, 0.12, 1.0]] },
+    // high ping: an octave up, glassy and tiny
+    { w: 1.0, atk: 0.003, decM: 0.8,
+      parts: [[2, 0.70, 1.2], [4.64, 0.30, 0.6], [8.5, 0.12, 0.3]] },
+  ];
+  const KIND_WSUM = BELL_KINDS.reduce((s, k) => s + k.w, 0);
   function bellStrike(){
     if(ctx.state === 'running' && xtalState.on){
+      let roll = Math.random()*KIND_WSUM, kind = BELL_KINDS[0];
+      for(const k of BELL_KINDS){ if((roll -= k.w) <= 0){ kind = k; break; } }
       const t0 = ctx.currentTime + 0.03;
       const f = singF*BELL_STEPS[Math.random()*BELL_STEPS.length|0]
               *(Math.random() < 0.35 ? 2 : 1);
       const vel = 0.25 + Math.random()*0.75;
       const ringM = (xtalState.crystal ? 1.6 : 1.0)*(1 - 0.35*(xtalState.thick || 0));
-      const hiM = (xtalState.crystal ? 1.35 : 1.0)*(1 - 0.40*(xtalState.thick || 0));
+      // velocity brightens the highs, softly struck bells stay round
+      const hiM = (0.55 + 0.65*vel)
+                *(xtalState.crystal ? 1.35 : 1.0)*(1 - 0.40*(xtalState.thick || 0));
       const pan = ctx.createStereoPanner(); pan.pan.value = Math.random()*1.6 - 0.8;
       pan.connect(bellG);
-      for(const [ratio, g0, dec] of [[1, 1.0, 2.6], [2.32, 0.42, 1.5],
-                                     [4.25, 0.16, 0.8], [6.63, 0.07, 0.45]]){
+      for(const [ratio, g0, dec] of kind.parts){
         const o = ctx.createOscillator(); o.type = 'sine';
         o.frequency.value = f*ratio*(1 + (Math.random() - 0.5)*0.003);
         const g = ctx.createGain();
-        const dM = dec*ringM*(0.8 + Math.random()*0.4);
+        const dM = dec*kind.decM*ringM*(0.7 + Math.random()*0.8);
         g.gain.setValueAtTime(0, t0);
-        g.gain.linearRampToValueAtTime(vel*g0*0.10*(ratio > 2 ? hiM : 1), t0 + 0.006);
+        g.gain.linearRampToValueAtTime(vel*g0*0.10*(ratio > 2 ? hiM : 1), t0 + kind.atk);
         g.gain.exponentialRampToValueAtTime(1e-4, t0 + dM);
         o.connect(g); g.connect(pan);
         o.start(t0); o.stop(t0 + dM*1.3 + 0.2);
       }
     }
-    setTimeout(bellStrike, 900 + Math.random()*4200);
+    setTimeout(bellStrike, 700 + Math.random()*5200);
   }
   bellStrike();
 
@@ -1780,7 +1803,7 @@ function frame(){
       AU.criG.gain.setTargetAtTime(0, now, 0.8);
       AU.birdG.gain.setTargetAtTime(0, now, 0.8);
       AU.xtal.gain.setTargetAtTime(0.9, now, 1.0);
-      AU.sing(Math.min(Math.max(1400 - 1650*maxR, 340), 1250));
+      AU.sing(Math.min(Math.max(1000 - 1200*maxR, 250), 880));
       // the deal facts the crystal voices are honest about
       AU.xtalState.cond = cond;
       AU.xtalState.crystal = isCrystal;
