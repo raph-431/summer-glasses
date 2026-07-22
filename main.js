@@ -1330,7 +1330,7 @@ function buildAudio(){
   // finger circling) + the wine glass's inharmonic 2.32 partial. The render
   // loop tunes it to the dealt glass — big bowls sing low.
   let singF = 880;
-  const singG = ctx.createGain(); singG.gain.value = 0.10; singG.connect(xtal);
+  const singG = ctx.createGain(); singG.gain.value = 0.07; singG.connect(xtal);
   const swell = ctx.createGain(); swell.gain.value = 0.55;   // breathes below
   const sLfo = ctx.createOscillator(); sLfo.frequency.value = 0.09;
   const sLfoG = ctx.createGain(); sLfoG.gain.value = 0.38;
