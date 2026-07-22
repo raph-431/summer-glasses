@@ -1448,6 +1448,45 @@ function buildAudio(){
   }
   drip();
 
+  // the MOTIF: every ~20 seconds, a soft two-to-four-note glass phrase on
+  // the deal's own scale — the recurring figure that gives the ambience
+  // its structure. Same identity every time, small variations (contour,
+  // pacing, register), played in the long-bloom voice.
+  const MOTIF_SHAPES = [
+    [1, 1.5, 2], [2, 1.5, 1], [1, 1.333, 1.688], [1.688, 1.333, 1],
+    [1, 2, 1.5], [1, 1.5], [1, 1.125, 1.5, 2],
+  ];
+  function motif(){
+    if(ctx.state === 'running' && xtalState.on){
+      const shape2 = MOTIF_SHAPES[Math.random()*MOTIF_SHAPES.length|0];
+      const base = singF*(singF < 450 ? 2 : 1)*(Math.random() < 0.2 ? 2 : 1);
+      const ringM = (xtalState.crystal ? 1.5 : 1.0)*(1 - 0.3*(xtalState.thick || 0));
+      const gap = 0.32 + Math.random()*0.30;
+      let t0 = ctx.currentTime + 0.05;
+      let pan0 = Math.random()*1.0 - 0.5;
+      for(const step of shape2){
+        const pan = ctx.createStereoPanner();
+        pan.pan.value = Math.min(Math.max(pan0, -1), 1);
+        pan.connect(bellG);
+        for(const [ratio, g0, dec] of [[1, 1.0, 3.2], [2.0, 0.10, 2.4], [2.32, 0.18, 2.0]]){
+          const o = ctx.createOscillator(); o.type = 'sine';
+          o.frequency.value = base*step*ratio*(1 + (Math.random() - 0.5)*0.002);
+          const g = ctx.createGain();
+          const dM = dec*ringM;
+          g.gain.setValueAtTime(0, t0);
+          g.gain.linearRampToValueAtTime(0.045*g0, t0 + 0.015);
+          g.gain.exponentialRampToValueAtTime(1e-4, t0 + dM);
+          o.connect(g); g.connect(pan);
+          o.start(t0); o.stop(t0 + dM + 0.2);
+        }
+        t0 += gap;
+        pan0 += 0.22;
+      }
+    }
+    setTimeout(motif, 17000 + Math.random()*8000);
+  }
+  setTimeout(motif, 6000 + Math.random()*6000);
+
   // SHARD CASCADE: every few minutes, a handful of tiny strikes tumbling
   // down a broken ladder — the memory of breakage, never the crash
   function shardCascade(){
