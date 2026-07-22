@@ -1312,7 +1312,10 @@ function frame(){
     // Whatever the roll, the dipped side must still clear the table.
     const highH = shape.H + Ri*stl + (Ri - maxR)*0.47;
     const lowH = 0.60*shape.H;
-    const Hi = Math.max(lowH + (highH - lowH)*ringHF[i], 0.15 + Ri*stl);
+    // the fill hoop balances the main one vertically too: when the main
+    // hangs low the fill perches high, and vice versa
+    const hf = i === 1 ? 1 - ringHF[0] : ringHF[i];
+    const Hi = Math.max(lowH + (highH - lowH)*hf, 0.15 + Ri*stl);
     const ca = Math.cos(Ai), sa = Math.sin(Ai);
     ringUArr[i*3] = Ri*ca*ctl; ringUArr[i*3+1] = -Ri*stl; ringUArr[i*3+2] = Ri*sa*ctl;
     ringVArr[i*3] = -Ri*sa;    ringVArr[i*3+1] = 0;       ringVArr[i*3+2] = Ri*ca;
