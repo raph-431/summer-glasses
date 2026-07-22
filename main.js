@@ -794,11 +794,11 @@ function randomize(){
     else if(cv < 0.85){ patLo = pBase + 0.28*span;  patHi = pBase + 0.72*span; }
     else{               patLo = pBase;              patHi = pTop - 0.25*span; }
   }
-  // helical lean: 40% of deals shear their pattern into a slight spiral
+  // helical lean: 20% of deals shear their pattern into a slight spiral
   // (fixed draw count so seeds stay stable)
   {
     const s1 = r(), s2 = r(), s3 = r();
-    patSkew = s1 < 0.6 ? 0 : (s2 < 0.5 ? -1 : 1)*(0.15 + 0.75*s3);
+    patSkew = s1 < 0.8 ? 0 : (s2 < 0.5 ? -1 : 1)*(0.15 + 0.75*s3);
   }
 
   // crystal: harder refraction, real fire, deep cuts. EXPERIMENT: half of
