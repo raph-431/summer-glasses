@@ -729,12 +729,14 @@ const PAPER_TRIALS = [
   { h:[0.18,0.38,0.90], d:[1.05,0.22,0.15], p:5, n:'gold + teal on kraft' },
   { h:[0.18,0.38,0.90], d:[0.15,0.95,0.75], p:1, n:'gold + crimson on ivory' },
 ];
-// the GRADUATED print palette: the 13 trial combos rapha kept (2026-07-22
-// review on combos.html). A negative deal rolls one of these whole —
-// hoop+sun light, companion light, stock — instead of deriving its inks
-// from the neon wheel. PAPER_TRIALS stays intact so #ptrial / combos.html
-// keep working for future auditions.
-const PRINTS = [0, 1, 4, 5, 6, 7, 8, 9, 11, 12, 14, 18, 19].map(i => PAPER_TRIALS[i]);
+// the GRADUATED print palette: the trial combos rapha kept (2026-07-22
+// reviews on combos.html — round one, then the orange/aqua/hot-pink/gold
+// round). A negative deal rolls one of these whole — hoop+sun light,
+// companion light, stock — instead of deriving its inks from the neon
+// wheel. PAPER_TRIALS stays intact so #ptrial / combos.html keep working
+// for future auditions.
+const PRINTS = [0, 1, 4, 5, 6, 7, 8, 9, 11, 12, 14, 18, 19,
+                23, 25, 28, 30, 31, 33].map(i => PAPER_TRIALS[i]);
 const METALS = [[0.92, 0.94, 0.98],   // silver
                 [1.00, 0.78, 0.38],   // gold
                 [0.98, 0.55, 0.38]];  // copper
