@@ -1488,7 +1488,8 @@ function buildAudio(){
       s.o.frequency.setTargetAtTime(f*s.ratio, ctx.currentTime, 0.6);
   };
 
-  return { ctx, master, rustle, cicG, criG, birdG, xtal, xtalState, sing };
+  return { ctx, master, rustle, cicG, criG, birdG, xtal, xtalState, sing,
+           singG, subG };
 }
 // snap the mix to the CURRENT world instantly — used when sound is first
 // enabled, where the gentle frame-loop crossfade would leak the wrong
@@ -1814,6 +1815,16 @@ function frame(){
       AU.birdG.gain.setTargetAtTime(0, now, 0.8);
       AU.xtal.gain.setTargetAtTime(0.9, now, 1.0);
       AU.sing(Math.min(Math.max(1400 - 1650*maxR, 340), 1250));
+      // the rim COMES AND GOES — a finger circles a while, lifts, returns
+      // minutes later; the floor drifts on its own slower clock. Driven by
+      // the piece's own 1D noise with thresholds, so true silences happen
+      // (sometimes both rest and only the bells speak).
+      const ss = (a, b, x) => {
+        x = Math.min(Math.max((x - a)/(b - a), 0), 1);
+        return x*x*(3 - 2*x);
+      };
+      AU.singG.gain.setTargetAtTime(0.05*ss(0.05, 0.50, snz(t*0.023, 41.0)), now, 1.5);
+      AU.subG.gain.setTargetAtTime(0.045*ss(-0.05, 0.42, snz(t*0.011, 87.0)), now, 2.5);
       // the deal facts the crystal voices are honest about
       AU.xtalState.cond = cond;
       AU.xtalState.crystal = isCrystal;
