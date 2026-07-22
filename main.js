@@ -169,8 +169,10 @@ let wantShot = false;
 // Snapshot-on-request, for a gallery showing many glasses: an embedder posts
 // {type:'summer-glass-snapshot-request', id} and gets a JPEG data URL back
 // once the caustic accumulation has settled (~10 frames of decay, so 15 is
-// comfortable). Purely a read of already-rendered pixels — it consumes no
-// randomness and cannot change which glass was dealt.
+// comfortable). The request may pass {after: N} to wait longer — the light
+// painting's long exposure needs a few hundred frames to charge. Purely a
+// read of already-rendered pixels — it consumes no randomness and cannot
+// change which glass was dealt.
 const SNAP_AFTER = 15;
 let snapReq = null, snapFrames = 0;
 addEventListener('message', e => {
@@ -1430,7 +1432,7 @@ function frame(){
   // below). Same constraint as the screenshot above — the pixels only exist
   // here, inside the render task — so the reply is sent from this point,
   // once the caustics have had time to accumulate.
-  if(snapReq && ++snapFrames >= SNAP_AFTER){
+  if(snapReq && ++snapFrames >= (snapReq.after ?? SNAP_AFTER)){
     const req = snapReq; snapReq = null;
     try {
       parent.postMessage({
