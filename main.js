@@ -676,6 +676,8 @@ const PAPERS = [
   [0.94, 0.98, 0.92],   // sage
   [0.98, 0.92, 0.82],   // light kraft
 ];
+// the lithograph stock: mid grey, gated rarer than the drawer (see roll)
+const PAPER_GREY = [0.58, 0.58, 0.60];
 let inverted = false, paperCol = PAPERS[0];
 const METALS = [[0.92, 0.94, 0.98],   // silver
                 [1.00, 0.78, 0.38],   // gold
@@ -814,7 +816,10 @@ function randomize(){
   // the negative print: ~30% of deals are inked on paper instead of lit,
   // each on a rolled stock from the paper drawer
   inverted = r() < 0.30;
-  paperCol = pick(r, PAPERS);
+  // ~1 in 8 negatives pulls the mid-grey lithograph stock; the rest roll
+  // the off-white drawer (these are the LAST rolls — the variable draw
+  // count is safe only while nothing rolls after them)
+  paperCol = r() < 0.125 ? PAPER_GREY : pick(r, PAPERS);
 
   // crystal: harder refraction, real fire, deep cuts. EXPERIMENT: half of
   // ALL bodies are crystal (no stemware bias), and COLOURED crystal is
