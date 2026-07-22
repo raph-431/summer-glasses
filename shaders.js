@@ -979,11 +979,6 @@ uniform float u_focus;       // camera-to-glass distance: the focal plane
 uniform float u_arty;        // light painting: the pool IS the subject — no DoF
 uniform float u_invert;      // 1 = negative: void becomes paper, light becomes ink
 uniform vec3  u_paperCol;    // the paper's tint (slightly off-white, per deal)
-uniform float u_hOn;         // handle (light painting only): 0 off, 1 on
-uniform float u_hAz;         // handle azimuth on the wall
-uniform vec2  u_hC;          // handle arc centre: (radial, height) in its plane
-uniform float u_hR;          // handle arc radius
-uniform float u_hT;          // handle tube radius
 float hash12(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453123); }
 void main(){
   vec2 uv = v_uv + u_wob;
@@ -1061,6 +1056,11 @@ uniform float u_arty;        // 1 = light painting: void + caustic + ghost vesse
 uniform vec3  u_ringC[3];    // neon rings: centres
 uniform vec3  u_ringU[3];    // neon rings: tilted basis × radius (dipping axis)
 uniform vec3  u_ringV[3];    // neon rings: tilted basis × radius (level axis)
+uniform float u_hOn;         // handle (light painting only): 0 off, 1 on
+uniform float u_hAz;         // handle azimuth on the wall
+uniform vec2  u_hC;          // handle arc centre: (radial, height) in its plane
+uniform float u_hR;          // handle arc radius
+uniform float u_hT;          // handle tube radius
 uniform vec3  u_ringWC;      // white bulb string inside the glass: its circle
 uniform vec3  u_ringWU;
 uniform vec3  u_ringWV;
