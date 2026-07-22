@@ -666,8 +666,17 @@ let metalScale = 3, metalWarp = 1;   // blotch size + how stringy they smear
 let metalType = 1;   // 0 winding bands, 1 splashes, 2 spots, 3 filaments
 // pattern coverage band + helical lean — rolled per deal in randomize()
 let patLo = 0.06, patHi = 1.0, patSkew = 0;
-// the negative print (light painting only): void→paper, light→ink
-let inverted = false;
+// the negative print (light painting only): void→paper, light→ink.
+// The stock is never pure white — a small curated drawer of papers.
+const PAPERS = [
+  [1.00, 0.97, 0.90],   // cream
+  [1.00, 0.95, 0.86],   // warm ivory
+  [0.92, 0.95, 1.00],   // cool blue-grey
+  [1.00, 0.93, 0.92],   // pale rose
+  [0.94, 0.98, 0.92],   // sage
+  [0.98, 0.92, 0.82],   // light kraft
+];
+let inverted = false, paperCol = PAPERS[0];
 const METALS = [[0.92, 0.94, 0.98],   // silver
                 [1.00, 0.78, 0.38],   // gold
                 [0.98, 0.55, 0.38]];  // copper
@@ -802,8 +811,10 @@ function randomize(){
     const s1 = r(), s2 = r(), s3 = r();
     patSkew = s1 < 0.8 ? 0 : (s2 < 0.5 ? -1 : 1)*(0.15 + 0.75*s3);
   }
-  // the negative print: ~30% of deals are inked on paper instead of lit
+  // the negative print: ~30% of deals are inked on paper instead of lit,
+  // each on a rolled stock from the paper drawer
   inverted = r() < 0.30;
+  paperCol = pick(r, PAPERS);
 
   // crystal: harder refraction, real fire, deep cuts. EXPERIMENT: half of
   // ALL bodies are crystal (no stemware bias), and COLOURED crystal is
@@ -1650,6 +1661,7 @@ function frame(){
   gl.uniform1f(uFin.u_focus, Math.hypot(rox, ch - taY, roz));
   gl.uniform1f(uFin.u_arty, lightPaint ? 1 : 0);
   gl.uniform1f(uFin.u_invert, (lightPaint && inverted) ? 1 : 0);
+  gl.uniform3f(uFin.u_paperCol, ...paperCol);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
   if(wantShot){
