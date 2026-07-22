@@ -677,6 +677,19 @@ const PAPERS = [
   [0.98, 0.92, 0.82],   // light kraft
 ];
 let inverted = false, paperCol = PAPERS[0];
+// papers that flatter each hue's INK (a negative prints the complement):
+// indices into PAPERS, curated per hoop colour. Born from a bad print —
+// amber's blue ink on greenish cream turned to olive mush.
+const PAPER_FOR = [
+  [3, 0, 2],   // magenta    → green ink:      rose / cream / blue-grey
+  [0, 1, 5],   // cyan       → flame ink:      cream / ivory / kraft
+  [2, 3],      // amber      → blue ink:       blue-grey / rose
+  [0, 3, 2],   // acid green → magenta ink:    cream / rose / blue-grey
+  [0, 1, 2],   // red-orange → teal ink:       cream / ivory / blue-grey
+  [2, 5, 0],   // violet     → chartreuse ink: blue-grey / kraft / cream
+  [0, 1, 5],   // ice blue   → tan ink:        cream / ivory / kraft
+  [0, 3, 2],   // pink       → jade ink:       cream / rose / blue-grey
+];
 const METALS = [[0.92, 0.94, 0.98],   // silver
                 [1.00, 0.78, 0.38],   // gold
                 [0.98, 0.55, 0.38]];  // copper
@@ -811,10 +824,10 @@ function randomize(){
     const s1 = r(), s2 = r(), s3 = r();
     patSkew = s1 < 0.8 ? 0 : (s2 < 0.5 ? -1 : 1)*(0.15 + 0.75*s3);
   }
-  // the negative print: half the deals are inked on paper instead of lit,
-  // each on a rolled stock from the paper drawer
+  // the negative print: half the deals are inked on paper instead of lit.
+  // The stock is rolled LATER, once the hoop colour is known — only from
+  // the papers curated for that hue's ink (PAPER_FOR).
   inverted = r() < 0.50;
-  paperCol = pick(r, PAPERS);
 
   // crystal: harder refraction, real fire, deep cuts. EXPERIMENT: half of
   // ALL bodies are crystal (no stemware bias), and COLOURED crystal is
@@ -890,6 +903,7 @@ function randomize(){
   ringOffR[0] = Math.min(ringOffR[0], RING_R[0]*ringRF[0] - 1.25);
   const hoopIdx = Math.floor(r()*NEONS.length);
   ringCol = NEONS[hoopIdx];
+  paperCol = PAPERS[pick(r, PAPER_FOR[hoopIdx])];   // stock suits the ink
   paintSunAz = r()*6.2832;
   paintSunEl = rng(r, 0.26, 1.05);     // 15°–60°: low rakes to high noon-ish,
                                        // always steep enough to land a fan
