@@ -1427,9 +1427,20 @@ void main(){
         vec3 Q = P + rr*tpl - u_ringC[k];
         float R2 = dot(u_ringU[k], u_ringU[k]);
         vec2 q = vec2(dot(Q, u_ringU[k]), dot(Q, u_ringV[k]))/R2; // 1 = on the hoop
-        float d = abs(length(q) - 1.0)*sqrt(R2);
+        float lq = length(q), sR = sqrt(R2);
+        float d = abs(lq - 1.0)*sR;
         float tubeG = exp(-d*d/0.012) + 0.25*exp(-d*d/0.15);      // core + halo
         colA += u_lightCol[k] * tubeG * mirW;
+        // DIAMOND FIRE: a far tighter, hotter core that only the cut
+        // facets carry — as a facet's reflection sweeps the tube it
+        // flashes, and three slightly offset radii split the flash into
+        // spectral fringes like fire in real crystal
+        float fR = (lq - 0.9955)*sR, fG = (lq - 1.0)*sR, fB = (lq - 1.0045)*sR;
+        vec3 fire = vec3(exp(-fR*fR/0.00025),
+                         exp(-fG*fG/0.00025),
+                         exp(-fB*fB/0.00025));
+        colA += u_lightCol[k] * fire * 3.0 * (0.5 + 1.5*fres)
+              * (0.25 + 0.75*fp) * mix(vec3(1.0), u_metalCol, met);
       }
       // ...and the white bulbs, mirrored in the wall as a string of glints
       for(int k=0;k<12;k++){
