@@ -493,6 +493,7 @@ let paintSunAz = 0.8, paintSunEl = 0.9;
 // opaque mirror — they block the caustic light and bounce it instead
 let metal = 0, metalSeed = 0, metalCol = [0.92, 0.94, 0.98];
 let metalScale = 3, metalWarp = 1;   // blotch size + how stringy they smear
+let metalType = 1;   // 0 winding bands, 1 splashes, 2 spots, 3 filaments
 const METALS = [[0.92, 0.94, 0.98],   // silver
                 [1.00, 0.78, 0.38],   // gold
                 [0.98, 0.55, 0.38]];  // copper
@@ -625,6 +626,7 @@ function randomize(){
   metalCol = pick(r, METALS);
   metalScale = 1.8*Math.exp(r()*1.5);  // log-uniform 1.8–8: islands..speckle
   metalWarp = rng(r, 0.0, 2.2);        // 0 round blobs .. stringy splatter
+  metalType = Math.floor(r()*4);       // bands / splashes / spots / filaments
   // the white bulb circle: pushed well off-centre — often halfway out the
   // wall — and slanted anywhere from a polite tip to a hard ~64° keel
   // (pow-biased: usually moderate, sometimes steep)
@@ -1005,6 +1007,7 @@ function frame(){
     gl.uniform3f(u.u_metalCol, ...metalCol);
     gl.uniform1f(u.u_metalScale, metalScale);
     gl.uniform1f(u.u_metalWarp, metalWarp);
+    gl.uniform1f(u.u_metalType, metalType);
   };
   const leaf  = parseFloat($('leaf').value);
   const sun   = parseFloat($('sun').value);

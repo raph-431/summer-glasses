@@ -63,6 +63,7 @@ uniform float u_metalSeed;  // reshuffles the blotches per deal
 uniform vec3  u_metalCol;   // which metal (silver / gold / copper)
 uniform float u_metalScale; // blotch size: big islands .. fine speckle
 uniform float u_metalWarp;  // domain warp: round blobs .. stringy splatter
+uniform float u_metalType;  // 0 winding bands, 1 splashes, 2 spots, 3 filaments
 
 float hash12(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453123); }
 vec2  hash22(vec2 p){
@@ -473,19 +474,45 @@ float dapple(vec3 P, int li){
 // wall. Sampled in WORLD space so it wraps the circumference seamlessly,
 // and defined here in SHARED so the photon tracer and the composite agree:
 // the mirror you see is exactly the mirror that blocks the light.
+// four skins, one per deal (u_metalType). All world-space and seamless
+// around the circumference; scale/warp/coverage read the same dials.
 float metalAt(vec3 P){
   if(u_metal <= 0.001) return 0.0;
-  // two decorrelated world-plane fbms blended, one warping the other's
-  // domain: isotropic splashes with no built-in grain direction (a single
-  // height-sheared sample used to stripe every deal with the same spiral).
-  // Scale and warp are per-deal: big islands .. fine stringy splatter.
+  float edge;
+  if(u_metalType < 0.5){
+    // WINDING BANDS: the height-sheared sample — streaks that wind around
+    // the glass like brushed leaf (the first version, kept as a variety)
+    float m = fbm(vec2(P.x + 2.7*P.y, P.z - 1.9*P.y)*u_metalScale*0.8 + u_metalSeed*13.7);
+    edge = mix(0.78, 0.34, u_metal);
+    return smoothstep(edge, edge - 0.10, m);
+  } else if(u_metalType < 1.5){
+    // SPLASHES: two decorrelated world-plane fbms, one warping the other's
+    // domain — isotropic poured-mercury blotches, round to stringy
+    vec2 q1 = vec2(P.x*0.9 + P.y*0.35, P.z*0.9 - P.y*0.28)*u_metalScale;
+    vec2 q2 = vec2(P.z*1.1 + P.y*0.90, P.x*1.1 + P.y*0.55)*u_metalScale*1.31;
+    float wp = fbm(q2 + u_metalSeed*7.7);
+    float m = fbm(q1 + u_metalSeed*13.7 + (wp - 0.5)*u_metalWarp);
+    m = 0.62*m + 0.38*fbm(q2*0.53 + u_metalSeed*3.9);
+    edge = mix(0.78, 0.34, u_metal);
+    return smoothstep(edge, edge - 0.10, m);
+  } else if(u_metalType < 2.5){
+    // SPOTS: sparse discs in a jittered grid — sequins of mirror
+    vec2 q = vec2(P.x + 1.6*P.y, P.z - 1.2*P.y)*u_metalScale*1.5 + u_metalSeed;
+    vec2 cell = floor(q);
+    vec2 f = fract(q) - 0.5;
+    vec2 o = (hash22(cell*5.3 + floor(u_metalSeed*7.0)) - 0.5)*0.6;
+    float rad = 0.16 + 0.22*u_metal + 0.10*hash12(cell*3.7);
+    float on = step(hash12(cell*9.1 + 2.2), 0.35 + 0.60*u_metal);
+    return smoothstep(rad, rad - 0.07, length(f - o)) * on;
+  }
+  // FILAMENTS: the ridge of a warped fbm — thin veins of mirror crawling
+  // over the wall; coverage fattens them
   vec2 q1 = vec2(P.x*0.9 + P.y*0.35, P.z*0.9 - P.y*0.28)*u_metalScale;
   vec2 q2 = vec2(P.z*1.1 + P.y*0.90, P.x*1.1 + P.y*0.55)*u_metalScale*1.31;
   float wp = fbm(q2 + u_metalSeed*7.7);
-  float m = fbm(q1 + u_metalSeed*13.7 + (wp - 0.5)*u_metalWarp);
-  m = 0.62*m + 0.38*fbm(q2*0.53 + u_metalSeed*3.9);
-  float edge = mix(0.78, 0.34, u_metal);          // coverage lowers the bar
-  return smoothstep(edge, edge - 0.10, m);
+  float rdg = 1.0 - abs(2.0*fbm(q1 + u_metalSeed*13.7 + (wp - 0.5)*u_metalWarp) - 1.0);
+  edge = mix(0.93, 0.74, u_metal);
+  return smoothstep(edge, edge + 0.05, rdg);
 }
 `;
 
