@@ -39,6 +39,10 @@
   }
   #corner button:hover { color:rgba(255,255,255,.9); }
   #audioBtn.on, #orbitBtn.on { color:rgba(255,235,200,.95); }
+  /* paper prints: ink-dark buttons on the light stock */
+  body.paper #corner button { color:rgba(25,22,18,.60); text-shadow:0 1px 8px rgba(255,255,255,.45); }
+  body.paper #corner button:hover { color:rgba(25,22,18,.9); }
+  body.paper #audioBtn.on, body.paper #orbitBtn.on { color:rgba(150,95,25,.95); }
   #infoPanel {
     position:fixed; right:22px; bottom:52px; z-index:2; display:none;
     font:13px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

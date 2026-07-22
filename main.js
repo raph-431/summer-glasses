@@ -1513,6 +1513,7 @@ function snapAudioWorld(){
 // the same smoothed target the mouse drags, so grabbing the canvas
 // mid-orbit works naturally — the lap resumes from wherever you let go.
 let autoOrbit = false;
+let paperUI = false;   // tracks the body.paper class (ink-dark buttons)
 const orbitBtn = document.getElementById('orbitBtn');
 orbitBtn.addEventListener('click', () => {
   autoOrbit = orbitBtn.classList.toggle('on');
@@ -1537,6 +1538,12 @@ function frame(){
       fpsEl.textContent = (1000*fpsN/fpsAcc).toFixed(0) + ' fps';
       fpsAcc = 0; fpsN = 0;
     }
+  }
+  // paper prints get ink-dark corner buttons (CSS body.paper)
+  const paperNow = lightPaint && inverted;
+  if(paperNow !== paperUI){
+    paperUI = paperNow;
+    document.body.classList.toggle('paper', paperNow);
   }
   if(autoOrbit) mouse[0] -= 0.00028;   // ~one lap per minute
   sm[0] += (mouse[0]-sm[0])*0.05;
