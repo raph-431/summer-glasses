@@ -1130,7 +1130,9 @@ function frame(){
   const ccot = chl/Math.max(-dirs[1], 0.08);
   const cdist = lightPaint ? 0 : Math.min(0.5*shape.H*ccot, 1.8);
   const caustC = lightPaint ? [0, 0] : [dirs[0]/chl*cdist, dirs[2]/chl*cdist];
-  const caustS = lightPaint ? 2.2 : Math.min(Math.max(0.9 + cdist, 1.7), 3.0);
+  // paint window ±3.0: room for a 15°-sun fan to run its full length
+  // before hitting the recording edge (the gain auto-compensates the area)
+  const caustS = lightPaint ? 3.0 : Math.min(Math.max(0.9 + cdist, 1.7), 3.0);
 
   // audio follows the weather and the hour: rustle rides the gusts, and the
   // cicada / cricket / bird mix crossfades with the time-of-day preset
