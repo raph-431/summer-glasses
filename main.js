@@ -486,6 +486,19 @@ const NEONS = [
   [1.05, 0.45, 0.75],   // pink
 ];
 let ringCol = NEONS[0];
+// curated companion per NEONS entry (by index): when the metal skin is
+// SPOTS, the sequins wear the hoop's duo colour instead of a raw metal —
+// pairings chosen by eye, not derived, so none land on a muddy in-between
+const DUOS = [
+  [0.15, 0.95, 0.75],   // magenta    → teal
+  [1.00, 0.62, 0.10],   // cyan       → amber
+  [0.35, 0.65, 1.10],   // amber      → ice blue
+  [0.55, 0.25, 1.10],   // acid green → violet
+  [0.10, 0.85, 1.05],   // red-orange → cyan
+  [0.55, 1.00, 0.12],   // violet     → acid green
+  [1.05, 0.45, 0.75],   // ice blue   → pink
+  [0.10, 0.85, 1.05],   // pink       → cyan
+];
 // a bare distant sun over the void (slot 2): classical parallel-ray caustic
 // cutting across the hoop's mandala. Warm white; pose rolled per deal.
 let paintSunAz = 0.8, paintSunEl = 0.9;
@@ -617,7 +630,8 @@ function randomize(){
   // reach cap must follow so a low hoop still clears the glass
   ringRF[0] = rng(r, 0.90, 1.55);
   ringOffR[0] = Math.min(ringOffR[0], RING_R[0]*ringRF[0] - 1.25);
-  ringCol = NEONS[Math.floor(r()*NEONS.length)];
+  const hoopIdx = Math.floor(r()*NEONS.length);
+  ringCol = NEONS[hoopIdx];
   paintSunAz = r()*6.2832;
   paintSunEl = rng(r, 0.55, 1.15);     // 32°–66°: fan lands inside the window
   // splashed metal: nearly every deal wears some
@@ -627,6 +641,9 @@ function randomize(){
   metalScale = 1.8*Math.exp(r()*1.5);  // log-uniform 1.8–8: islands..speckle
   metalWarp = rng(r, 0.0, 2.2);        // 0 round blobs .. stringy splatter
   metalType = Math.floor(r()*4);       // bands / splashes / spots / filaments
+  // spots swap their metal for the hoop's curated duo colour: the sequins
+  // are tuned to the deal's neon rather than silver/gold/copper
+  if(metalType === 2) metalCol = DUOS[hoopIdx];
   // the white bulb circle: pushed well off-centre — often halfway out the
   // wall — and slanted anywhere from a polite tip to a hard ~64° keel
   // (pow-biased: usually moderate, sometimes steep)
