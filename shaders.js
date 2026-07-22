@@ -611,7 +611,9 @@ void main(){
     vec3 hitw = P4w + doutw*s4w;
     gl_Position = vec4((hitw.xz - u_caustC)/u_caustS, 0.0, 1.0);
     gl_PointSize = 1.5;
-    v_col = u_bulbCol * ww * chCol * 0.90;      // duo-hued, dispersing at edges
+    v_col = u_bulbCol * ww * chCol * 1.15;      // duo-hued, dispersing at edges
+                                                // (brighter: colour reads dimmer
+                                                // than the white it replaced)
     return;
   }
 
@@ -1394,7 +1396,7 @@ void main(){
         if(tk <= 0.0) continue;
         float d2k = dot(vk - rr*tk, vk - rr*tk);
         float tgw = exp(-d2k/0.00015) + 0.12*exp(-d2k/0.003);
-        colA += u_bulbCol * 1.22 * tgw * mirW;
+        colA += u_bulbCol * 1.45 * tgw * mirW;
       }
       // the distant sun's glint: one hard sparkle per facet
       vec3 hs = reflect(u_lightDir[2], N);
@@ -1412,7 +1414,7 @@ void main(){
       if(tk <= 0.0 || (tTable < 1e4 && tk > tTable)) continue;
       float d2k = dot(vk - rd*tk, vk - rd*tk);
       float g = exp(-d2k/0.00015) + 0.10*exp(-d2k/0.003);
-      colA += u_bulbCol * 1.42 * g;
+      colA += u_bulbCol * 1.80 * g;
       if(g > 0.5) hitA = min(hitA, tk);           // the bulbs hold focus
     }
     o = vec4(colA, hitA);
