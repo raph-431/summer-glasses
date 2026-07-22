@@ -1103,6 +1103,15 @@ function buildAudio(){
 
   return { ctx, master, rustle, cicG, criG, birdG };
 }
+// auto-orbit: a slow lap of the glass (~60 s per revolution). It nudges
+// the same smoothed target the mouse drags, so grabbing the canvas
+// mid-orbit works naturally — the lap resumes from wherever you let go.
+let autoOrbit = false;
+const orbitBtn = document.getElementById('orbitBtn');
+orbitBtn.addEventListener('click', () => {
+  autoOrbit = orbitBtn.classList.toggle('on');
+});
+
 const audioBtn = document.getElementById('audioBtn');
 audioBtn.addEventListener('click', () => {
   if(!AU){ AU = buildAudio(); }
@@ -1122,6 +1131,7 @@ function frame(){
       fpsAcc = 0; fpsN = 0;
     }
   }
+  if(autoOrbit) mouse[0] -= 0.00028;   // ~one lap per minute
   sm[0] += (mouse[0]-sm[0])*0.05;
   sm[1] += (mouse[1]-sm[1])*0.05;
   zoomSm += (zoom - zoomSm)*0.08;

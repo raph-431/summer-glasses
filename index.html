@@ -38,7 +38,7 @@
     user-select:none;
   }
   #corner button:hover { color:rgba(255,255,255,.9); }
-  #audioBtn.on { color:rgba(255,235,200,.95); }
+  #audioBtn.on, #orbitBtn.on { color:rgba(255,235,200,.95); }
   #infoPanel {
     position:fixed; right:22px; bottom:52px; z-index:2; display:none;
     font:13px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -71,6 +71,7 @@
 <div id="err">This demo needs WebGL2 with float render targets.</div>
 <div id="legend"></div>
 <div id="corner">
+  <button id="orbitBtn" title="slowly circle the glass">auto-orbit</button>
   <button id="shotBtn" title="save this frame as a picture">download</button>
   <button id="infoBtn">info</button>
   <button id="audioBtn">sound on/off</button>
