@@ -53,6 +53,10 @@ const N     = Math.min(Math.max(+(params.get('n') || 24), 1), 96);
 // across cells (what matters here is comparability, not final brightness)
 const AFTER = Math.min(Math.max(+(params.get('after') || 300), 20), 2000);
 const CONC  = 3;              // live WebGL contexts at once (browser cap ~16)
+// ?shapes=mlp / ?shapes=classic forces a pure population of one shape
+// engine — the A/B view for taste-bred vs preset/crossbred glassware
+const SHAPES_FLAG = params.get('shapes');
+const hashFor = seed => '#seed=' + seed + (SHAPES_FLAG ? '&shapes=' + SHAPES_FLAG : '');
 
 const $ = id => document.getElementById(id);
 const grid = $('grid'), st = $('st');
@@ -72,7 +76,7 @@ function build(){
     view.className = 'view pending';
     const cap = document.createElement('a');
     cap.textContent = seed;
-    cap.href = 'index.html#seed=' + seed;
+    cap.href = 'index.html' + hashFor(seed);
     cap.target = '_blank';
     cell.append(view, cap);
     grid.append(cell);
@@ -88,7 +92,7 @@ function pump(){
     const c = queue.shift();
     active++;
     const f = document.createElement('iframe');
-    f.src = 'index.html#seed=' + c.seed;
+    f.src = 'index.html' + hashFor(c.seed);
     const shield = document.createElement('div');
     shield.className = 'shield';
     c.view.classList.remove('pending');

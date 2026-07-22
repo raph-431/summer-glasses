@@ -240,6 +240,161 @@ applyShape('highball');
 $('shape').addEventListener('change', e => applyShape(e.target.value));
 
 // ---------------------------------------------------------------------------
+// TASTE-BRED SHAPES — the second shape engine (coexists 50/50 with the
+// presets; force one with #shapes=mlp / #shapes=classic). A tiny critic
+// (18 features → 16 tanh → 1 sigmoid; weights baked into taste.js by
+// tools/train-taste.mjs from rapha's like/dislike ratings) scores a pool
+// of random genomes each deal; a Gumbel top-1 pick at low temperature
+// becomes the glass. Genome, feature and profile code below MUST mirror
+// generate-vessel.js exactly — the critic only understands shapes
+// described in its own training coordinates.
+// ---------------------------------------------------------------------------
+const TASTE_K = 9, TASTE_HMAX = 2.2, TASTE_NBOWL = 5;
+const TASTE_SR = {
+  height: [1.6, 2.4], footR: [0.28, 0.55], footH: [0.06, 0.24], footCurve: [0.5, 1.8],
+  stemR: [0.045, 0.105], taper: [0.6, 1.3], bulge: [0, 0.14], bulgePos: [0.2, 0.8],
+  bowlFrac: [0.32, 0.60],
+};
+const TASTE_KEYS = Object.keys(TASTE_SR);
+
+function tasteScore(fam, x){
+  const net = TASTE[fam];
+  let z = net.b2;
+  for(let j=0;j<net.W2.length;j++){
+    let s = net.b1[j];
+    const row = net.W1[j];
+    for(let i=0;i<row.length;i++) s += row[i]*x[i];
+    z += net.W2[j]*Math.tanh(s);
+  }
+  return 1/(1 + Math.exp(-z));
+}
+// samplers: FIXED draw counts (11 / 16) so every candidate costs the same
+// slice of the deal's rng stream — determinism by construction
+function tasteRandomVessel(r){
+  const radii = [];
+  let rr = 0.2 + r()*0.5;
+  for(let i=0;i<TASTE_K;i++){
+    rr = Math.min(1.0, Math.max(0.06, rr + (r() - 0.5)*0.36));
+    radii.push(rr);
+  }
+  radii[0] = Math.min(0.7, Math.max(0.16, radii[0]));
+  return { radii, height: 0.9 + r()*1.3 };
+}
+function tasteRandomStem(r){
+  const g = {};
+  for(const k of TASTE_KEYS){ const [a, b] = TASTE_SR[k]; g[k] = a + r()*(b - a); }
+  if(r() < 0.55) g.bulge = 0;
+  let rr = 0.08 + r()*0.30;
+  g.bowl = [];
+  for(let i=0;i<TASTE_NBOWL;i++){
+    g.bowl.push(rr);
+    rr = Math.min(1.0, Math.max(0.07, rr + (r() - 0.3)*0.45));
+  }
+  return g;
+}
+function tasteFeatVessel(g){
+  const f = g.radii.slice();
+  f.push(g.height/TASTE_HMAX);
+  for(let i=1;i<TASTE_K;i++) f.push(g.radii[i] - g.radii[i-1]);
+  return f;
+}
+function tasteFeatStem(g){
+  const f = TASTE_KEYS.map(k => {
+    const [a, b] = TASTE_SR[k];
+    const v = g[k] === undefined ? (a + b)/2 : g[k];
+    return (v - a)/(b - a);
+  });
+  f.push(...g.bowl);
+  for(let i=1;i<TASTE_NBOWL;i++) f.push(g.bowl[i] - g.bowl[i-1]);
+  return f;
+}
+// centripetal Catmull-Rom — the trainer's curve (three.js default), NOT the
+// shader's uniform CR: candidates must be judged on the curve they were
+// rated with, then resampled into the shader's 8 knots
+function tasteCR(points, samples){
+  const P = [points[0], ...points, points[points.length-1]];
+  const out = [];
+  const segN = Math.max(2, Math.floor(samples/(P.length - 3)));
+  const dist = (a, b) => Math.max(Math.hypot(b[0]-a[0], b[1]-a[1]), 1e-6);
+  for(let i=0;i<P.length-3;i++){
+    const [p0, p1, p2, p3] = [P[i], P[i+1], P[i+2], P[i+3]];
+    const t0 = 0, t1 = t0 + Math.sqrt(dist(p0, p1)),
+          t2 = t1 + Math.sqrt(dist(p1, p2)), t3 = t2 + Math.sqrt(dist(p2, p3));
+    for(let s=0;s<segN;s++){
+      const t = t1 + (t2 - t1)*s/segN;
+      const lerp2 = (a, b, ta, tb) => {
+        const w = (t - ta)/(tb - ta);
+        return [a[0] + (b[0]-a[0])*w, a[1] + (b[1]-a[1])*w];
+      };
+      const A1 = lerp2(p0, p1, t0, t1), A2 = lerp2(p1, p2, t1, t2), A3 = lerp2(p2, p3, t2, t3);
+      const B1 = lerp2(A1, A2, t0, t2), B2 = lerp2(A2, A3, t1, t3);
+      out.push(lerp2(B1, B2, t1, t2));
+    }
+  }
+  out.push([...P[P.length-2]]);
+  return out;
+}
+function tasteProfileAt(prof, y){
+  for(let i=1;i<prof.length;i++){
+    if(prof[i][1] >= y){
+      const [r0, ya] = prof[i-1], [r1, yb] = prof[i];
+      const w = yb > ya ? Math.min(Math.max((y - ya)/(yb - ya), 0), 1) : 0;
+      return r0 + (r1 - r0)*w;
+    }
+  }
+  return prof[prof.length-1][0];
+}
+function breedShape(fam, r){
+  const featF = fam === 'vessel' ? tasteFeatVessel : tasteFeatStem;
+  const randF = fam === 'vessel' ? tasteRandomVessel : tasteRandomStem;
+  let best = null, bestKey = -1e9, bestScore = 0;
+  for(let i=0;i<400;i++){
+    const g = randF(r);
+    const s = tasteScore(fam, featF(g));
+    // Gumbel top-1 at T=0.2: nearly always a high scorer, but spread over
+    // every region the critic likes instead of one favourite ridge
+    const key = s/0.2 - Math.log(-Math.log(Math.max(r(), 1e-12)));
+    if(key > bestKey){ bestKey = key; best = g; bestScore = s; }
+  }
+  return { g: best, score: bestScore };
+}
+// genome → the piece's shape object (8 shader knots + analytic stem/foot)
+function shapeFromVesselGenome(g){
+  const H = g.height*0.78;
+  const cp = g.radii.map((rr, i) => [Math.max(rr, 0.012), g.height*i/(TASTE_K - 1)]);
+  const prof = tasteCR(cp, 90);
+  const knots = [];
+  for(let i=0;i<8;i++){
+    const y = g.height*i/7;                      // resample in genome space
+    knots.push(Math.min(Math.max(tasteProfileAt(prof, y)*0.52, 0.05), 0.60));
+  }
+  return { H, y0: 0, stemR: 0, footR: 0, footH: 0, cavBase: 0.07, wall: 0.045,
+           fillMax: 0.88, patTop: H - 0.18, prof: knots,
+           stemTaper: 1, bulge: 0, bulgePos: 0.5, footCurve: 1.4 };
+}
+function shapeFromStemGenome(g){
+  const H = g.height*0.72;
+  const y0 = H*(1 - g.bowlFrac);
+  const yB = g.height*(1 - g.bowlFrac);          // genome-space bowl bottom
+  const bowlH = g.height - yB;
+  const cp = [[Math.max(g.stemR*g.taper, 0.03), yB]];
+  g.bowl.forEach((rr, i) => cp.push([rr, yB + bowlH*(i + 1)/TASTE_NBOWL]));
+  const prof = tasteCR(cp, 60);
+  const knots = [];
+  for(let i=0;i<8;i++){
+    const y = yB + bowlH*i/7;
+    knots.push(Math.min(Math.max(tasteProfileAt(prof, y)*0.55, 0.05), 0.60));
+  }
+  return { H, y0,
+           stemR: g.stemR*0.55, footR: g.footR*0.55,
+           footH: Math.min(Math.max(g.footH*0.13, 0.012), 0.034),
+           cavBase: 0.05, wall: 0.028, fillMax: 0.88, patTop: H - 0.18,
+           prof: knots,
+           stemTaper: g.taper, bulge: g.bulge*0.55, bulgePos: g.bulgePos,
+           footCurve: 0.8 + (g.footCurve ?? 1.15)*0.8 };
+}
+
+// ---------------------------------------------------------------------------
 // TIME OF DAY — each preset is a full light environment: sun angle and
 // colour, the two secondary foliage-gap lights, sky/leaf/ground palette for
 // envColor, table ambient, backdrop, penumbra hardness.
@@ -530,6 +685,26 @@ function randomize(){
   const r = mulberry32(seed = (seed*1664525 + 1013904223)|0);
   const set = (id, v) => { $(id).value = v; };
 
+  // ---- which shape engine deals this glass? The roll is ALWAYS consumed
+  // so a #shapes= flag never shifts the seed's remaining rolls.
+  const mlpRoll = r() < 0.5;
+  const useMLP = location.hash.includes('shapes=mlp') ? true
+               : location.hash.includes('shapes=classic') ? false
+               : mlpRoll;
+  let shapeName, bred = null;
+  if(useMLP && typeof TASTE !== 'undefined'){
+    // TASTE-BRED: sample a pool of genomes, let the critic pick
+    const fam = r() < 0.65 ? 'vessel' : 'stem';
+    bred = breedShape(fam, r);
+    bred.fam = fam;
+    shape = fam === 'vessel' ? shapeFromVesselGenome(bred.g)
+                             : shapeFromStemGenome(bred.g);
+    // nearest classic label keeps $features / RIM_ODDS / liquid tables sane
+    shapeName = fam === 'vessel' ? 'highball' : 'wine';
+    $('shape').value = shapeName;
+    $('wall').value = shape.wall;
+    console.log(`bred ${fam} — critic score ${bred.score.toFixed(3)}`);
+  } else {
   // EXPERIMENT: crossbred vessels. Two parent families blend — knots,
   // height, stem, foot, cavity, wall — into silhouettes the cupboard never
   // held (martini×barrel, flute×fishbowl...). ~30% of deals stay purebred
@@ -548,6 +723,7 @@ function randomize(){
     patTop: mixN(A.patTop ?? A.H - 0.18, B.patTop ?? B.H - 0.18),
     noIce: (tb < 0.5 ? A : B).noIce,
     prof: A.knots.map((k, i) => mixN(k, B.knots[i])),
+    stemTaper: 1, bulge: 0, bulgePos: 0.5, footCurve: 1.4,   // classic stem
   };
   // a vestigial stem is worse than none: snap it off, or give it real bones
   if(shape.y0 > 0 && shape.y0 < 0.12){
@@ -557,7 +733,7 @@ function randomize(){
     shape.footR = Math.max(shape.footR, 0.16);
     shape.footH = Math.max(shape.footH, 0.012);
   }
-  const shapeName = tb < 0.5 ? nameA : nameB;  // the dominant parent names it
+  shapeName = tb < 0.5 ? nameA : nameB;        // the dominant parent names it
   $('shape').value = shapeName;
   $('wall').value = shape.wall;
   // jitter the knots, delta-clamped so the raymarcher stays stable. The
@@ -565,7 +741,8 @@ function randomize(){
   // civilized ±5–8%, a tail reaches ±20% — the wonky hand-blown outliers
   // read as a trait, not as universal noise. The clamp is relative to the
   // BLENDED base deltas (an absolute cap would flatten deliberately steep
-  // profiles like the fishbowl's bulb)
+  // profiles like the fishbowl's bulb). Bred shapes skip all of this: the
+  // critic's pick is used verbatim.
   const jit = 0.05 + 0.15*Math.pow(r(), 3);
   const baseK = shape.prof.slice();
   shape.prof = shape.prof.map(k => k*(1 - jit + 2*jit*r()));
@@ -573,6 +750,7 @@ function randomize(){
     const d0 = baseK[i] - baseK[i-1];
     const d = shape.prof[i] - shape.prof[i-1];
     shape.prof[i] = shape.prof[i-1] + Math.min(Math.max(d, d0 - 0.05), d0 + 0.05);
+  }
   }
   // the foot must carry the bowl: crossbreeding could hand a huge upper
   // body a doll's foot. Scale the foot (and a touch of the stem) to the
@@ -715,7 +893,7 @@ function randomize(){
   // as the info panel)
   window.$features = {
     drink:     selText('liquid'),
-    glassware: (isCrystal ? 'crystal ' : '') + selText('shape'),
+    glassware: (bred ? `bred ${bred.fam} ` : '') + (isCrystal ? 'crystal ' : '') + selText('shape'),
     pattern:   selText('pat'),
     timeOfDay: selText('tod'),
     canopy:    selText('canopy'),
@@ -1033,6 +1211,11 @@ function frame(){
     gl.uniform1f(u.u_stemR, shape.stemR);
     gl.uniform1f(u.u_footR, shape.footR);
     gl.uniform1f(u.u_footH, shape.footH);
+    // bred-stem extensions; classic shapes carry neutral values
+    gl.uniform1f(u.u_stemTaper, shape.stemTaper ?? 1);
+    gl.uniform1f(u.u_bulge, shape.bulge ?? 0);
+    gl.uniform1f(u.u_bulgePos, shape.bulgePos ?? 0.5);
+    gl.uniform1f(u.u_footCurve, shape.footCurve ?? 1.4);
     gl.uniform1f(u.u_cavY, cavY);
     gl.uniform1f(u.u_maxR, maxR);
     gl.uniform1f(u.u_baseR, baseR);

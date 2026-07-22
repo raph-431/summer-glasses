@@ -26,6 +26,10 @@ uniform float u_y0;         // bowl bottom (0 for tumblers)
 uniform float u_stemR;      // stem radius (stemware only)
 uniform float u_footR;      // foot radius
 uniform float u_footH;      // foot thickness
+uniform float u_stemTaper;  // stem top/bottom radius ratio (1 = classic)
+uniform float u_bulge;      // gaussian bulge amplitude on the stem (0 = none)
+uniform float u_bulgePos;   // where along the stem the bulge sits (0..1)
+uniform float u_footCurve;  // foot→stem blend exponent (1.4 = classic)
 uniform float u_cavY;       // cavity floor: top of the solid base / bowl base
 uniform float u_maxR;       // widest radius incl. foot
 uniform float u_baseR;      // radius at the table (contact shadow, puddle)
@@ -93,11 +97,18 @@ float profileR(float y){
              + (-p0+3.0*p1-3.0*p2+p3)*f*f*f);
   if(u_y0 < 0.01) return bowl;    // tumblers sit straight on the table
   // the foot: a thin disc whose top is slightly domed, sweeping smoothly
-  // into the stem — no hard ledge for the raymarcher to alias on
+  // into the stem — no hard ledge for the raymarcher to alias on. The stem
+  // itself may taper and carry a gaussian bulge (taste-bred stemware);
+  // neutral uniforms (taper 1, bulge 0, curve 1.4) reproduce the classic
+  // cylinder exactly.
   float t = y/max(u_footH, 1e-3);
-  float k = pow(smoothstep(0.30, 3.0, t), 1.4);
+  float k = pow(smoothstep(0.30, 3.0, t), u_footCurve);
   float disc = u_footR * (1.0 - 0.05*clamp(t, 0.0, 1.0));
-  float stem = max(mix(disc, u_stemR, k), u_stemR);
+  float sst = clamp((y - u_footH)/max(u_y0 - u_footH, 1e-3), 0.0, 1.0);
+  float bq = (sst - u_bulgePos)/0.16;    // squared by hand: pow() is UB on
+  float rStem = u_stemR*mix(1.0, u_stemTaper, sst)   // negative bases
+              + u_bulge*exp(-bq*bq);
+  float stem = max(mix(disc, rStem, k), rStem);
   // blown in one piece: the stem flares smoothly into the bowl underside
   // instead of meeting it at a hard step
   float h = smoothstep(u_y0 - 0.09, u_y0 + 0.09, y);
