@@ -1345,17 +1345,16 @@ function buildAudio(){
     singOsc.push({ o, ratio });
   }
 
-  // a SECOND RIM: another glass being sung a quarter-tone off the first
-  // (two real glasses never match). Its own gain gate, its own slower
-  // swell — when both happen to sing, the pair cross-beats; mostly they
-  // trade off on independent clocks.
+  // a SECOND RIM: a companion glass singing a just major third above the
+  // first — when both sound, they make a chord. Its own gain gate and its
+  // own slower swell; mostly they trade off on independent clocks.
   const sing2G = ctx.createGain(); sing2G.gain.value = 0; sing2G.connect(xtal);
   const swell2 = ctx.createGain(); swell2.gain.value = 0.55;
   const s2Lfo = ctx.createOscillator(); s2Lfo.frequency.value = 0.067;
   const s2LfoG = ctx.createGain(); s2LfoG.gain.value = 0.38;
   s2Lfo.connect(s2LfoG); s2LfoG.connect(swell2.gain); s2Lfo.start();
   swell2.connect(sing2G);
-  const OFF2 = 1.031;                    // ~52 cents sharp of the first rim
+  const OFF2 = 1.25;                     // a just major third above the first
   for(const [ratio, lvl] of [[OFF2, 0.50], [OFF2*1.0038, 0.36], [OFF2*2.32, 0.045]]){
     const o = ctx.createOscillator(); o.type = 'sine';
     o.frequency.value = singF*ratio;
