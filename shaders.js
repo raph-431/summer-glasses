@@ -1016,8 +1016,10 @@ void main(){
   // the negative: everything above — exposure, bloom, vignette, grain —
   // happens in light space; the flip is purely the print, pulled onto a
   // slightly coloured stock (the tint multiplies, so paper takes the hue
-  // fully while the ink stays near-black)
-  if(u_invert > 0.5) col = u_paperCol*(1.0 - col);
+  // fully while the ink stays near-black). GILDING: metal patches (mask
+  // in the scene alpha, paint mode only) keep their LIT colour — foil
+  // stamped on the print instead of inverting to a ghost of itself.
+  if(u_invert > 0.5) col = mix(u_paperCol*(1.0 - col), col, clamp(sc.a, 0.0, 1.0));
   o = vec4(col, 1.0);
 }
 `;
@@ -1371,6 +1373,10 @@ void main(){
     // sampled first so it glows straight through the ghost.
     vec3 colA = vec3(0.0);
     float hitA = 30.0;
+    float metVis = 0.0;   // metal seen at this pixel — rides the output
+                          // alpha (DoF, its old tenant, is off in paint
+                          // mode) so the print pass can gild instead of
+                          // inverting it
     if(tTable < 1e4){
       hitA = tTable;
       vec3 P = ro + rd*tTable;
@@ -1435,6 +1441,7 @@ void main(){
       // the pool stops shining through and every light mirrors at full
       // strength in the metal's colour, not just at grazing angles
       float met = metalAt(P);
+      metVis = met;
       colA *= 1.0 - 0.35*fres;                    // the rim dims the pool behind
       colA *= 1.0 - 0.85*met;                     // the skin blocks it outright
       colA += ghost * fres * (0.14 + 0.22*fp) * (1.0 - met);
@@ -1508,7 +1515,7 @@ void main(){
       colA += u_bulbCol * 1.80 * g;
       if(g > 0.5) hitA = min(hitA, tk);           // the bulbs hold focus
     }
-    o = vec4(colA, hitA);
+    o = vec4(colA, metVis);   // alpha = metal mask (paint mode has no DoF)
     return;
   }
 
