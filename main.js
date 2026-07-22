@@ -560,11 +560,15 @@ function randomize(){
   const shapeName = tb < 0.5 ? nameA : nameB;  // the dominant parent names it
   $('shape').value = shapeName;
   $('wall').value = shape.wall;
-  // jitter the knots ±5%, delta-clamped so the raymarcher stays stable.
-  // The clamp is relative to the BLENDED base deltas (an absolute cap
-  // would flatten deliberately steep profiles like the fishbowl's bulb)
+  // jitter the knots, delta-clamped so the raymarcher stays stable. The
+  // AMOUNT is itself a per-deal roll, cubically biased: most deals stay a
+  // civilized ±5–8%, a tail reaches ±20% — the wonky hand-blown outliers
+  // read as a trait, not as universal noise. The clamp is relative to the
+  // BLENDED base deltas (an absolute cap would flatten deliberately steep
+  // profiles like the fishbowl's bulb)
+  const jit = 0.05 + 0.15*Math.pow(r(), 3);
   const baseK = shape.prof.slice();
-  shape.prof = shape.prof.map(k => k*(0.95 + 0.10*r()));
+  shape.prof = shape.prof.map(k => k*(1 - jit + 2*jit*r()));
   for(let i=1;i<8;i++){
     const d0 = baseK[i] - baseK[i-1];
     const d = shape.prof[i] - shape.prof[i-1];
