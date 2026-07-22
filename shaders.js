@@ -1012,9 +1012,16 @@ void main(){
   col = col / (1.0 + col*0.35);
   col = pow(max(col, 0.0), vec3(0.90));
   col += (hash12(gl_FragCoord.xy + fract(u_time)*61.7) - 0.5)*0.02;
-  // the negative: everything above — exposure, bloom, vignette, grain —
-  // happens in light space; the flip is purely the print
-  if(u_invert > 0.5) col = 1.0 - col;
+  // the print: everything above — exposure, bloom, vignette, grain —
+  // happens in light space. Not a true negative (that complements every
+  // hue — magenta printed green): intensity becomes ink DENSITY on paper
+  // while the ink keeps the light's own colour, deep-toned. Hot white
+  // cores print near-black; faint washes print as pale tints of the hue.
+  if(u_invert > 0.5){
+    float mI = pow(clamp(max(col.r, max(col.g, col.b)), 0.0, 1.0), 0.9);
+    vec3 tint = col / max(mI, 1e-4);
+    col = mix(vec3(1.0), tint*0.30, mI);
+  }
   o = vec4(col, 1.0);
 }
 `;
