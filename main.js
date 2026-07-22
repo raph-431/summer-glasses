@@ -710,6 +710,24 @@ const PAPER_TRIALS = [
   { h:[1.00,0.80,0.30], d:[1.02,1.00,0.96], p:1, n:'violet-blue + india on ivory' },
   { h:[0.35,0.65,1.10], d:[1.10,0.15,0.20], p:2, n:'tan + cyan on blue-grey' },
   { h:[1.05,0.60,0.45], d:[0.15,0.95,0.75], p:3, n:'slate + crimson on rose' },
+  // round two (#20–35): orange / aqua / hot pink / gold ink families.
+  // Ink ⇐ light: orange⇐azure, aqua⇐crimson, hot pink⇐emerald, gold⇐cobalt.
+  { h:[0.05,0.50,0.95], d:[1.04,1.01,0.96], p:0, n:'orange + india on cream' },
+  { h:[0.05,0.50,0.95], d:[1.05,0.15,0.22], p:1, n:'orange + aqua on ivory' },
+  { h:[0.05,0.50,0.95], d:[1.00,0.62,0.10], p:2, n:'orange + prussian on blue-grey' },
+  { h:[0.05,0.50,0.95], d:[0.10,0.85,0.50], p:3, n:'orange + hot pink on rose' },
+  { h:[1.05,0.15,0.22], d:[1.04,1.01,0.96], p:0, n:'aqua + india on cream' },
+  { h:[1.05,0.15,0.22], d:[0.05,0.50,0.95], p:5, n:'aqua + orange on kraft' },
+  { h:[1.05,0.15,0.22], d:[0.10,0.85,0.50], p:1, n:'aqua + hot pink on ivory' },
+  { h:[0.08,0.85,0.48], d:[1.04,1.01,0.96], p:0, n:'hot pink + india on cream' },
+  { h:[0.08,0.85,0.48], d:[0.18,0.38,0.90], p:1, n:'hot pink + gold on ivory' },
+  { h:[0.08,0.85,0.48], d:[1.05,0.15,0.22], p:2, n:'hot pink + aqua on blue-grey' },
+  { h:[0.08,0.85,0.48], d:[0.05,0.50,0.95], p:3, n:'hot pink + orange on rose' },
+  { h:[0.18,0.38,0.90], d:[1.04,1.01,0.96], p:0, n:'gold + india on cream' },
+  { h:[0.18,0.38,0.90], d:[1.00,0.62,0.10], p:1, n:'gold + prussian on ivory' },
+  { h:[0.18,0.38,0.90], d:[0.10,0.85,0.50], p:3, n:'gold + hot pink on rose' },
+  { h:[0.18,0.38,0.90], d:[1.05,0.22,0.15], p:5, n:'gold + teal on kraft' },
+  { h:[0.18,0.38,0.90], d:[0.15,0.95,0.75], p:1, n:'gold + crimson on ivory' },
 ];
 // the GRADUATED print palette: the 13 trial combos rapha kept (2026-07-22
 // review on combos.html). A negative deal rolls one of these whole —

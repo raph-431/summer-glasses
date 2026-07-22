@@ -33,7 +33,7 @@
 <header>
   <h1>paper combo trials</h1>
   <span id="st"></span>
-  <span style="color:#55555e">20 combos × 3 glasses — click a print to open it live</span>
+  <span style="color:#55555e">?from=&amp;to= picks the trial range (default: newest block) — click a print to open it live</span>
 </header>
 <div id="rows"></div>
 <script>
@@ -41,7 +41,6 @@
 const params = new URLSearchParams(location.search);
 const SEEDS = (params.get('seeds') || 'cafe1234,7b1ce995,40d1c3aa').split(',').slice(0, 3);
 const AFTER = Math.min(Math.max(+(params.get('after') || 260), 20), 2000);
-const NTRIALS = 20;
 const CONC = 3;
 
 // names mirrored from main.js PAPER_TRIALS for row labels
@@ -56,13 +55,25 @@ const NAMES = [
   'amber + teal on cream', 'teal + sepia on ivory',
   'violet-blue + india on ivory', 'tan + cyan on blue-grey',
   'slate + crimson on rose',
+  // round two: orange / aqua / hot pink / gold
+  'orange + india on cream', 'orange + aqua on ivory',
+  'orange + prussian on blue-grey', 'orange + hot pink on rose',
+  'aqua + india on cream', 'aqua + orange on kraft',
+  'aqua + hot pink on ivory', 'hot pink + india on cream',
+  'hot pink + gold on ivory', 'hot pink + aqua on blue-grey',
+  'hot pink + orange on rose', 'gold + india on cream',
+  'gold + prussian on ivory', 'gold + hot pink on rose',
+  'gold + teal on kraft', 'gold + crimson on ivory',
 ];
+// ?from / ?to select the trial range; defaults to the newest audition block
+const FROM = Math.max(+(params.get('from') ?? 20), 0);
+const TO = Math.min(+(params.get('to') ?? NAMES.length - 1), NAMES.length - 1);
 
 const rows = document.getElementById('rows'), st = document.getElementById('st');
 const cells = [], queue = [];
 let active = 0, done = 0;
 
-for(let t = 0; t < NTRIALS; t++){
+for(let t = FROM; t <= TO; t++){
   const row = document.createElement('div');
   row.className = 'trial';
   const nm = document.createElement('div');
