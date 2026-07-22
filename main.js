@@ -858,8 +858,8 @@ function randomize(){
   paintSunAz = r()*6.2832;
   paintSunEl = rng(r, 0.26, 1.05);     // 15°–60°: low rakes to high noon-ish,
                                        // always steep enough to land a fan
-  // splashed metal: nearly every deal wears some
-  metal = r() < 0.95 ? rng(r, 0.15, 0.65) : 0;
+  // splashed metal: three quarters of the deals wear some
+  metal = r() < 0.75 ? rng(r, 0.15, 0.65) : 0;
   metalSeed = r()*100;
   metalCol = pick(r, METALS);
   metalScale = 1.8*Math.exp(r()*1.5);  // log-uniform 1.8–8: islands..speckle
