@@ -1402,9 +1402,17 @@ void main(){
       vec3 hs = reflect(u_lightDir[2], N);
       colA += u_lightCol[2] * pow(max(dot(hs, -rd), 0.0), 200.0) * (3.0*(1.0 - met) + 2.5*met) * mix(vec3(1.0), u_metalCol, met);
     }
-    // the white bulbs, seen directly — the one light in the piece you can
-    // look at: a string of hot points hanging in the vessel. Deliberately
-    // unphysical: they draw over the ghost and through the wall.
+    // the distant sun, made visible: a hard disc with a tight halo hanging
+    // in the void exactly where its parallel rays come from, in the deal's
+    // own hue. The table hides it below the horizon; the ghost, being
+    // glass, lets it through.
+    if(tTable > 1e4){
+      float sa = max(dot(rd, -u_lightDir[2]), 0.0);
+      colA += u_lightCol[2] * (pow(sa, 6000.0)*10.0 + pow(sa, 300.0)*1.2 + pow(sa, 40.0)*0.10);
+    }
+
+    // the bulbs, seen directly: hot points hanging in the vessel.
+    // Deliberately unphysical: they draw over the ghost and through the wall.
     for(int k=0;k<12;k++){
       if(float(k) >= u_ringWN) break;
       float ph = u_ringWPh0 + u_ringWSpan*(float(k) + 0.5)/u_ringWN;
