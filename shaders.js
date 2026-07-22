@@ -977,6 +977,7 @@ uniform vec2  u_wob;         // handheld frame wobble (uv units)
 uniform vec2  u_px;          // one pixel, in uv units
 uniform float u_focus;       // camera-to-glass distance: the focal plane
 uniform float u_arty;        // light painting: the pool IS the subject — no DoF
+uniform float u_invert;      // 1 = negative: void becomes paper, light becomes ink
 float hash12(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453123); }
 void main(){
   vec2 uv = v_uv + u_wob;
@@ -1011,6 +1012,9 @@ void main(){
   col = col / (1.0 + col*0.35);
   col = pow(max(col, 0.0), vec3(0.90));
   col += (hash12(gl_FragCoord.xy + fract(u_time)*61.7) - 0.5)*0.02;
+  // the negative: everything above — exposure, bloom, vignette, grain —
+  // happens in light space; the flip is purely the print
+  if(u_invert > 0.5) col = 1.0 - col;
   o = vec4(col, 1.0);
 }
 `;
