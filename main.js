@@ -1345,9 +1345,29 @@ function buildAudio(){
     singOsc.push({ o, ratio });
   }
 
+  // the FLOOR: a sub-drone two octaves under the rim note — the "large
+  // dark room" the long exposure implies. Two whisker-detuned sines,
+  // breathing slower than the rim's swell.
+  const subG = ctx.createGain(); subG.gain.value = 0.11; subG.connect(xtal);
+  const subSwell = ctx.createGain(); subSwell.gain.value = 0.70;
+  const subLfo = ctx.createOscillator(); subLfo.frequency.value = 0.05;
+  const subLfoG = ctx.createGain(); subLfoG.gain.value = 0.25;
+  subLfo.connect(subLfoG); subLfoG.connect(subSwell.gain); subLfo.start();
+  subSwell.connect(subG);
+  const subOsc = [];
+  for(const [ratio, lvl] of [[0.25, 0.60], [0.2508, 0.45]]){
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.value = singF*ratio;
+    const g = ctx.createGain(); g.gain.value = lvl;
+    o.connect(g); g.connect(subSwell); o.start();
+    subOsc.push({ o, ratio });
+  }
+
   // STRUCK CRYSTAL: random bell hits with wine-glass partials (inharmonic
   // 2.32 / 4.25 / 6.63), pitched on a pentatonic-ish ladder above the rim
-  // note so the chimes always agree with the singing
+  // note so the chimes always agree with the singing. MATERIAL TRUTH:
+  // crystal deals ring ~1.6x longer and brighter; thick walls damp and
+  // dull the strike — the bells are honest about the dealt body.
   const bellG = ctx.createGain(); bellG.gain.value = 1.0;
   bellG.connect(xtal); bellG.connect(shimmer);
   const BELL_STEPS = [1, 1.125, 1.333, 1.5, 1.688, 2, 2.25];
@@ -1357,6 +1377,8 @@ function buildAudio(){
       const f = singF*BELL_STEPS[Math.random()*BELL_STEPS.length|0]
               *(Math.random() < 0.35 ? 2 : 1);
       const vel = 0.25 + Math.random()*0.75;
+      const ringM = (xtalState.crystal ? 1.6 : 1.0)*(1 - 0.35*(xtalState.thick || 0));
+      const hiM = (xtalState.crystal ? 1.35 : 1.0)*(1 - 0.40*(xtalState.thick || 0));
       const pan = ctx.createStereoPanner(); pan.pan.value = Math.random()*1.6 - 0.8;
       pan.connect(bellG);
       for(const [ratio, g0, dec] of [[1, 1.0, 2.6], [2.32, 0.42, 1.5],
@@ -1364,21 +1386,80 @@ function buildAudio(){
         const o = ctx.createOscillator(); o.type = 'sine';
         o.frequency.value = f*ratio*(1 + (Math.random() - 0.5)*0.003);
         const g = ctx.createGain();
+        const dM = dec*ringM*(0.8 + Math.random()*0.4);
         g.gain.setValueAtTime(0, t0);
-        g.gain.linearRampToValueAtTime(vel*g0*0.10, t0 + 0.006);
-        g.gain.exponentialRampToValueAtTime(1e-4, t0 + dec*(0.8 + Math.random()*0.4));
+        g.gain.linearRampToValueAtTime(vel*g0*0.10*(ratio > 2 ? hiM : 1), t0 + 0.006);
+        g.gain.exponentialRampToValueAtTime(1e-4, t0 + dM);
         o.connect(g); g.connect(pan);
-        o.start(t0); o.stop(t0 + dec*1.3 + 0.2);
+        o.start(t0); o.stop(t0 + dM*1.3 + 0.2);
       }
     }
     setTimeout(bellStrike, 900 + Math.random()*4200);
   }
   bellStrike();
 
+  // CONDENSATION DRIPS: the droplets the wall shows, heard — a pitch-
+  // rising water plink whose rate follows the deal's condensation.
+  // Dry deals stay silent.
+  function drip(){
+    if(ctx.state === 'running' && xtalState.on
+       && (xtalState.cond || 0) > 0.15 && Math.random() < xtalState.cond*0.8){
+      const t0 = ctx.currentTime + 0.02;
+      const f0 = 700 + Math.random()*900;
+      const o = ctx.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(f0, t0);
+      o.frequency.exponentialRampToValueAtTime(
+        f0*(1.6 + Math.random()*0.9), t0 + 0.06 + Math.random()*0.08);
+      const g = ctx.createGain();
+      const pan = ctx.createStereoPanner(); pan.pan.value = Math.random()*1.2 - 0.6;
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(0.05 + Math.random()*0.05, t0 + 0.005);
+      g.gain.exponentialRampToValueAtTime(1e-4, t0 + 0.22);
+      o.connect(g); g.connect(pan); pan.connect(xtal);
+      o.start(t0); o.stop(t0 + 0.3);
+    }
+    setTimeout(drip, 1800 + Math.random()*6000);
+  }
+  drip();
+
+  // SHARD CASCADE: every few minutes, a handful of tiny strikes tumbling
+  // down a broken ladder — the memory of breakage, never the crash
+  function shardCascade(){
+    if(ctx.state === 'running' && xtalState.on){
+      let t0 = ctx.currentTime + 0.05;
+      let f = singF*(3 + Math.random()*2);
+      let pan0 = Math.random()*1.4 - 0.7;
+      const n = 5 + (Math.random()*5 | 0);
+      for(let i = 0; i < n; i++){
+        const dec = 0.12 + Math.random()*0.22;
+        const pan = ctx.createStereoPanner();
+        pan.pan.value = Math.min(Math.max(pan0, -1), 1);
+        pan.connect(bellG);
+        for(const [ratio, g0] of [[1, 1.0], [2.32, 0.25]]){
+          const o = ctx.createOscillator(); o.type = 'sine';
+          o.frequency.value = f*ratio*(1 + (Math.random() - 0.5)*0.01);
+          const g = ctx.createGain();
+          g.gain.setValueAtTime(0, t0);
+          g.gain.linearRampToValueAtTime(0.045*g0, t0 + 0.004);
+          g.gain.exponentialRampToValueAtTime(1e-4, t0 + dec);
+          o.connect(g); g.connect(pan);
+          o.start(t0); o.stop(t0 + dec + 0.1);
+        }
+        t0 += 0.05 + Math.random()*0.14;
+        f *= 0.78 + Math.random()*0.17;
+        pan0 += (Math.random() - 0.5)*0.3;
+      }
+    }
+    setTimeout(shardCascade, 120000 + Math.random()*120000);
+  }
+  shardCascade();
+
   const sing = f => {
     singF = f;
     for(const s of singOsc)
       s.o.frequency.setTargetAtTime(f*s.ratio, ctx.currentTime, 0.4);
+    for(const s of subOsc)
+      s.o.frequency.setTargetAtTime(f*s.ratio, ctx.currentTime, 0.6);
   };
 
   return { ctx, master, rustle, cicG, criG, birdG, xtal, xtalState, sing };
@@ -1700,6 +1781,10 @@ function frame(){
       AU.birdG.gain.setTargetAtTime(0, now, 0.8);
       AU.xtal.gain.setTargetAtTime(0.9, now, 1.0);
       AU.sing(Math.min(Math.max(1400 - 1650*maxR, 340), 1250));
+      // the deal facts the crystal voices are honest about
+      AU.xtalState.cond = cond;
+      AU.xtalState.crystal = isCrystal;
+      AU.xtalState.thick = Math.min(Math.max((wallv - 0.03)/0.12, 0), 1);
     } else {
       AU.xtalState.on = false;
       AU.xtal.gain.setTargetAtTime(0, now, 0.6);
