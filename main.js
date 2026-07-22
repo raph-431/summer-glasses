@@ -528,14 +528,43 @@ function randomize(){
   const r = mulberry32(seed = (seed*1664525 + 1013904223)|0);
   const set = (id, v) => { $(id).value = v; };
 
-  const shapeName = pick(r, Object.keys(SHAPES));
-  $('shape').value = shapeName; applyShape(shapeName);
+  // EXPERIMENT: crossbred vessels. Two parent families blend — knots,
+  // height, stem, foot, cavity, wall — into silhouettes the cupboard never
+  // held (martini×barrel, flute×fishbowl...). ~30% of deals stay purebred
+  // so the archetypes survive in the population.
+  const names = Object.keys(SHAPES);
+  const nameA = pick(r, names);
+  const nameB = pick(r, names);
+  const tb = (nameB === nameA || r() < 0.30) ? 0 : rng(r, 0.15, 0.85);
+  const A = SHAPES[nameA], B = SHAPES[nameB];
+  const mixN = (a, b) => a + (b - a)*tb;
+  shape = {
+    H: mixN(A.H, B.H), y0: mixN(A.y0, B.y0),
+    stemR: mixN(A.stemR, B.stemR), footR: mixN(A.footR, B.footR),
+    footH: mixN(A.footH, B.footH), cavBase: mixN(A.cavBase, B.cavBase),
+    wall: mixN(A.wall, B.wall), fillMax: mixN(A.fillMax, B.fillMax),
+    patTop: mixN(A.patTop ?? A.H - 0.18, B.patTop ?? B.H - 0.18),
+    noIce: (tb < 0.5 ? A : B).noIce,
+    prof: A.knots.map((k, i) => mixN(k, B.knots[i])),
+  };
+  // a vestigial stem is worse than none: snap it off, or give it real bones
+  if(shape.y0 > 0 && shape.y0 < 0.12){
+    shape.y0 = 0; shape.stemR = 0; shape.footR = 0; shape.footH = 0;
+  } else if(shape.y0 > 0){
+    shape.stemR = Math.max(shape.stemR, 0.022);
+    shape.footR = Math.max(shape.footR, 0.16);
+    shape.footH = Math.max(shape.footH, 0.012);
+  }
+  const shapeName = tb < 0.5 ? nameA : nameB;  // the dominant parent names it
+  $('shape').value = shapeName;
+  $('wall').value = shape.wall;
   // jitter the knots ±5%, delta-clamped so the raymarcher stays stable.
-  // The clamp is relative to each shape's own base deltas (an absolute cap
+  // The clamp is relative to the BLENDED base deltas (an absolute cap
   // would flatten deliberately steep profiles like the fishbowl's bulb)
+  const baseK = shape.prof.slice();
   shape.prof = shape.prof.map(k => k*(0.95 + 0.10*r()));
   for(let i=1;i<8;i++){
-    const d0 = SHAPES[shapeName].knots[i] - SHAPES[shapeName].knots[i-1];
+    const d0 = baseK[i] - baseK[i-1];
     const d = shape.prof[i] - shape.prof[i-1];
     shape.prof[i] = shape.prof[i-1] + Math.min(Math.max(d, d0 - 0.05), d0 + 0.05);
   }
