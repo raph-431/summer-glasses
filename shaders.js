@@ -1053,6 +1053,7 @@ uniform float u_night;       // 1 = night: string lights + stars in the sky
 uniform float u_table;       // 0 stone, 1 wood planks, 2 glazed tiles, 3 concrete, 4 pale wood
 uniform float u_tabRot;      // per-deal spin of the plank direction
 uniform float u_arty;        // 1 = light painting: void + caustic + ghost vessel
+uniform float u_hideG;       // 1 = caustics only: no ghost, no bulbs (H key)
 uniform vec3  u_ringC[3];    // neon rings: centres
 uniform vec3  u_ringU[3];    // neon rings: tilted basis × radius (dipping axis)
 uniform vec3  u_ringV[3];    // neon rings: tilted basis × radius (level axis)
@@ -1383,7 +1384,8 @@ void main(){
         colA = pow(max(cSharp*1.45 + cSoft*0.35, vec3(0.0)), vec3(0.88));
       }
     }
-    float tG = tGlass > 0.0 ? tGlass : 1e5;
+    // H key: study view — the pool alone, vessel and bulbs dismissed
+    float tG = (tGlass > 0.0 && u_hideG < 0.5) ? tGlass : 1e5;
     if(tLiq < tG && tLiq < 1e4){
       // looking down onto the open surface: a dim ember disc, the pool
       // shimmering faintly beneath it
@@ -1495,7 +1497,7 @@ void main(){
     // the bulbs, seen directly: hot points hanging in the vessel.
     // Deliberately unphysical: they draw over the ghost and through the wall.
     for(int k=0;k<12;k++){
-      if(float(k) >= u_ringWN) break;
+      if(float(k) >= u_ringWN || u_hideG > 0.5) break;
       float ph = u_ringWPh0 + u_ringWSpan*(float(k) + 0.5)/u_ringWN;
       vec3 Pk = u_ringWC + u_ringWU*cos(ph) + u_ringWV*sin(ph);
       vec3 vk = Pk - ro;

@@ -65,6 +65,7 @@ const CAUST_DECAY = 0.90;            // ~10-frame accumulation window
 // memory) so the swaying light drags spectral trails; the gain is rescaled
 // to the same steady state.
 let lightPaint = true;               // L toggles live, for A/B against realism
+let hideGlass = false;               // H: caustics-only study view (paint mode)
 const PAINT_DECAY = 0.997;
 // auto-exposure servo: the ring's per-deal pose (offset/tilt) changes how
 // many photons survive to the floor, so a fixed gain leaves some deals
@@ -187,6 +188,9 @@ addEventListener('keydown', e => {
     lightPaint = !lightPaint;
     expoN = 0;   // restart the exposure servo's charge model with the buffer
   }
+  // caustics-only study view (paint mode): the pool alone, no ghost/bulbs.
+  // (haiku.js also listens on H, but its caption layer is CSS-parked.)
+  if(e.key === 'h' || e.key === 'H') hideGlass = !hideGlass;
 });
 
 const $ = id => document.getElementById(id);
@@ -1612,6 +1616,7 @@ function frame(){
   gl.uniform1f(uC.u_table, parseFloat($('table').value));
   gl.uniform1f(uC.u_tabRot, tabRot);
   gl.uniform1f(uC.u_arty, lightPaint ? 1 : 0);
+  gl.uniform1f(uC.u_hideG, hideGlass ? 1 : 0);
   gl.uniform3fv(uC.u_ringC, ringCArr);
   gl.uniform3fv(uC.u_ringU, ringUArr);
   gl.uniform3fv(uC.u_ringV, ringVArr);
