@@ -1345,6 +1345,25 @@ function buildAudio(){
     singOsc.push({ o, ratio });
   }
 
+  // a SECOND RIM: another glass being sung a quarter-tone off the first
+  // (two real glasses never match). Its own gain gate, its own slower
+  // swell — when both happen to sing, the pair cross-beats; mostly they
+  // trade off on independent clocks.
+  const sing2G = ctx.createGain(); sing2G.gain.value = 0; sing2G.connect(xtal);
+  const swell2 = ctx.createGain(); swell2.gain.value = 0.55;
+  const s2Lfo = ctx.createOscillator(); s2Lfo.frequency.value = 0.067;
+  const s2LfoG = ctx.createGain(); s2LfoG.gain.value = 0.38;
+  s2Lfo.connect(s2LfoG); s2LfoG.connect(swell2.gain); s2Lfo.start();
+  swell2.connect(sing2G);
+  const OFF2 = 1.031;                    // ~52 cents sharp of the first rim
+  for(const [ratio, lvl] of [[OFF2, 0.50], [OFF2*1.0038, 0.36], [OFF2*2.32, 0.045]]){
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.value = singF*ratio;
+    const g = ctx.createGain(); g.gain.value = lvl;
+    o.connect(g); g.connect(swell2); o.start();
+    singOsc.push({ o, ratio });          // retuned with the first by sing()
+  }
+
   // the FLOOR: a sub-drone two octaves under the rim note — the "large
   // dark room" the long exposure implies. Two whisker-detuned sines,
   // breathing slower than the rim's swell.
@@ -1528,7 +1547,7 @@ function buildAudio(){
   };
 
   return { ctx, master, rustle, cicG, criG, birdG, xtal, xtalState, sing,
-           singG, subG };
+           singG, sing2G, subG };
 }
 // snap the mix to the CURRENT world instantly — used when sound is first
 // enabled, where the gentle frame-loop crossfade would leak the wrong
@@ -1865,6 +1884,7 @@ function frame(){
       // thresholds set for ~2/3 presence — silences still happen, but as
       // pauses for breath rather than long absences
       AU.singG.gain.setTargetAtTime(0.05*ss(-0.15, 0.35, snz(t*0.023, 41.0)), now, 1.5);
+      AU.sing2G.gain.setTargetAtTime(0.04*ss(-0.10, 0.38, snz(t*0.019, 63.0)), now, 1.7);
       AU.subG.gain.setTargetAtTime(0.045*ss(-0.28, 0.28, snz(t*0.011, 87.0)), now, 2.5);
       // the deal facts the crystal voices are honest about
       AU.xtalState.cond = cond;
