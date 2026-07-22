@@ -65,15 +65,19 @@ const NAMES = [
   'gold + prussian on ivory', 'gold + hot pink on rose',
   'gold + teal on kraft', 'gold + crimson on ivory',
 ];
-// ?from / ?to select the trial range; defaults to the newest audition block
+// ?from / ?to select a trial range (default: newest audition block), or
+// ?trials=0,1,4,... names an explicit list — e.g. the graduated PRINTS set
 const FROM = Math.max(+(params.get('from') ?? 20), 0);
 const TO = Math.min(+(params.get('to') ?? NAMES.length - 1), NAMES.length - 1);
+const LIST = params.get('trials')
+  ? params.get('trials').split(',').map(Number).filter(t => NAMES[t] !== undefined)
+  : Array.from({length: TO - FROM + 1}, (_, i) => FROM + i);
 
 const rows = document.getElementById('rows'), st = document.getElementById('st');
 const cells = [], queue = [];
 let active = 0, done = 0;
 
-for(let t = FROM; t <= TO; t++){
+for(const t of LIST){
   const row = document.createElement('div');
   row.className = 'trial';
   const nm = document.createElement('div');
