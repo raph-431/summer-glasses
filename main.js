@@ -1421,27 +1421,30 @@ function buildAudio(){
   }
   bellStrike();
 
-  // CONDENSATION DRIPS: the droplets the wall shows, heard — a pitch-
-  // rising water plink whose rate follows the deal's condensation.
-  // Dry deals stay silent.
+  // CONDENSATION TICKS: not a cartoon plink — the near-subliminal tap of
+  // a droplet letting go and landing on the foot. A tiny damped two-
+  // partial micro-strike; rate still follows the deal's condensation,
+  // dry deals stay silent.
   function drip(){
     if(ctx.state === 'running' && xtalState.on
-       && (xtalState.cond || 0) > 0.15 && Math.random() < xtalState.cond*0.8){
+       && (xtalState.cond || 0) > 0.15 && Math.random() < xtalState.cond*0.7){
       const t0 = ctx.currentTime + 0.02;
-      const f0 = 700 + Math.random()*900;
-      const o = ctx.createOscillator(); o.type = 'sine';
-      o.frequency.setValueAtTime(f0, t0);
-      o.frequency.exponentialRampToValueAtTime(
-        f0*(1.6 + Math.random()*0.9), t0 + 0.06 + Math.random()*0.08);
-      const g = ctx.createGain();
+      const f0 = 2000 + Math.random()*2200;
+      const dec = 0.04 + Math.random()*0.05;
       const pan = ctx.createStereoPanner(); pan.pan.value = Math.random()*1.2 - 0.6;
-      g.gain.setValueAtTime(0, t0);
-      g.gain.linearRampToValueAtTime(0.05 + Math.random()*0.05, t0 + 0.005);
-      g.gain.exponentialRampToValueAtTime(1e-4, t0 + 0.22);
-      o.connect(g); g.connect(pan); pan.connect(xtal);
-      o.start(t0); o.stop(t0 + 0.3);
+      pan.connect(xtal);
+      for(const [ratio, g0] of [[1, 1.0], [2.32, 0.30]]){
+        const o = ctx.createOscillator(); o.type = 'sine';
+        o.frequency.value = f0*ratio*(1 + (Math.random() - 0.5)*0.01);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime((0.020 + Math.random()*0.018)*g0, t0 + 0.002);
+        g.gain.exponentialRampToValueAtTime(1e-4, t0 + dec);
+        o.connect(g); g.connect(pan);
+        o.start(t0); o.stop(t0 + dec + 0.05);
+      }
     }
-    setTimeout(drip, 1800 + Math.random()*6000);
+    setTimeout(drip, 2400 + Math.random()*7000);
   }
   drip();
 
