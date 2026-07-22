@@ -1774,6 +1774,7 @@ function frame(){
   gl.uniform1f(uC.u_tabRot, tabRot);
   gl.uniform1f(uC.u_arty, lightPaint ? 1 : 0);
   gl.uniform1f(uC.u_hideG, hideGlass ? 1 : 0);
+  gl.uniform1f(uC.u_neg, (lightPaint && inverted) ? 1 : 0);
   gl.uniform3fv(uC.u_ringC, ringCArr);
   gl.uniform3fv(uC.u_ringU, ringUArr);
   gl.uniform3fv(uC.u_ringV, ringVArr);

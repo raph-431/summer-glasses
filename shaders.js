@@ -1069,6 +1069,7 @@ uniform float u_tabRot;      // per-deal spin of the plank direction
 uniform float u_arty;        // 1 = light painting: void + caustic + ghost vessel
 uniform float u_hideG;       // 1 = caustics only: no ghost, no bulbs (H key)
 uniform vec2  u_jit;         // sub-pixel ray jitter (temporal AA, uv units)
+uniform float u_neg;         // 1 = this deal prints as a negative (paper)
 uniform vec3  u_ringC[3];    // neon rings: centres
 uniform vec3  u_ringU[3];    // neon rings: tilted basis × radius (dipping axis)
 uniform vec3  u_ringV[3];    // neon rings: tilted basis × radius (level axis)
@@ -1510,6 +1511,14 @@ void main(){
     }
     // (the sun is unseen again — only its light: the fan, the arc and the
     // facet glint. The bulb stays the one light you can look at.)
+
+    // paper-sky gradient (negatives only): emit a rising wash of the
+    // COMPANION's light into the empty sky — the print renders it as the
+    // accent ink deepening from bare paper at the horizon toward the top
+    // of the page. Lit deals keep their black void.
+    if(u_neg > 0.5 && tTable > 1e4){
+      colA += u_bulbCol * (smoothstep(0.0, 0.55, rd.y) * 0.30);
+    }
 
     // the bulbs, seen directly: hot points hanging in the vessel.
     // Deliberately unphysical: they draw over the ghost and through the wall.
