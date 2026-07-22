@@ -1862,8 +1862,10 @@ function frame(){
         x = Math.min(Math.max((x - a)/(b - a), 0), 1);
         return x*x*(3 - 2*x);
       };
-      AU.singG.gain.setTargetAtTime(0.05*ss(0.05, 0.50, snz(t*0.023, 41.0)), now, 1.5);
-      AU.subG.gain.setTargetAtTime(0.045*ss(-0.05, 0.42, snz(t*0.011, 87.0)), now, 2.5);
+      // thresholds set for ~2/3 presence — silences still happen, but as
+      // pauses for breath rather than long absences
+      AU.singG.gain.setTargetAtTime(0.05*ss(-0.15, 0.35, snz(t*0.023, 41.0)), now, 1.5);
+      AU.subG.gain.setTargetAtTime(0.045*ss(-0.28, 0.28, snz(t*0.011, 87.0)), now, 2.5);
       // the deal facts the crystal voices are honest about
       AU.xtalState.cond = cond;
       AU.xtalState.crystal = isCrystal;
