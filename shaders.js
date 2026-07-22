@@ -1402,9 +1402,40 @@ void main(){
       vec3 hs = reflect(u_lightDir[2], N);
       colA += u_lightCol[2] * pow(max(dot(hs, -rd), 0.0), 200.0) * (3.0*(1.0 - met) + 2.5*met) * mix(vec3(1.0), u_metalCol, met);
     }
-    // (the bulb itself is no longer drawn: like the hoop and the sun it is
-    // an unseen source — present only through its caustics and its glints
-    // in the facets. The direct-view point loop lived here; see git.)
+    // the hoop itself, made visible: a fat neon tube hanging in the void,
+    // drawn with the same plane-intersection glow as its mirror image —
+    // so what you see and what the facets reflect are the same object
+    {
+      vec3 nh = normalize(cross(u_ringU[0], u_ringV[0]));
+      float dnh = dot(rd, nh);
+      if(abs(dnh) > 1e-4){
+        float tph = dot(u_ringC[0] - ro, nh)/dnh;
+        if(tph > 0.0 && (tTable > 1e4 || tph < tTable)){
+          vec3 Qh = ro + rd*tph - u_ringC[0];
+          float R2h = dot(u_ringU[0], u_ringU[0]);
+          vec2 qh = vec2(dot(Qh, u_ringU[0]), dot(Qh, u_ringV[0]))/R2h;
+          float dh = abs(length(qh) - 1.0)*sqrt(R2h);
+          float gh = exp(-dh*dh/0.0009) + 0.20*exp(-dh*dh/0.014);
+          colA += u_lightCol[0] * gh * 1.5;
+          if(gh > 0.5) hitA = min(hitA, tph);   // the tube holds focus
+        }
+      }
+    }
+    // the bulbs, seen directly: hot points hanging in the vessel.
+    // Deliberately unphysical: they draw over the ghost and through
+    // the wall.
+    for(int k=0;k<12;k++){
+      if(float(k) >= u_ringWN) break;
+      float ph = u_ringWPh0 + u_ringWSpan*(float(k) + 0.5)/u_ringWN;
+      vec3 Pk = u_ringWC + u_ringWU*cos(ph) + u_ringWV*sin(ph);
+      vec3 vk = Pk - ro;
+      float tk = dot(vk, rd);
+      if(tk <= 0.0 || (tTable < 1e4 && tk > tTable)) continue;
+      float d2k = dot(vk - rd*tk, vk - rd*tk);
+      float g = exp(-d2k/0.00015) + 0.10*exp(-d2k/0.003);
+      colA += u_bulbCol * 1.80 * g;
+      if(g > 0.5) hitA = min(hitA, tk);           // the bulbs hold focus
+    }
     o = vec4(colA, hitA);
     return;
   }
