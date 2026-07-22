@@ -904,6 +904,9 @@ function randomize(){
   const hoopIdx = Math.floor(r()*NEONS.length);
   ringCol = NEONS[hoopIdx];
   paperCol = PAPERS[pick(r, PAPER_FOR[hoopIdx])];   // stock suits the ink
+  // violet prints as chartreuse-green ink beside its companion's blue —
+  // the one ink pairing that never worked. Violet deals stay lit.
+  if(hoopIdx === 5) inverted = false;
   paintSunAz = r()*6.2832;
   paintSunEl = rng(r, 0.26, 1.05);     // 15°–60°: low rakes to high noon-ish,
                                        // always steep enough to land a fan
