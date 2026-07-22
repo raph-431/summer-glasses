@@ -42,9 +42,22 @@ const params = new URLSearchParams(location.search);
 const SEEDS = (params.get('seeds') || 'cafe1234,7b1ce995,40d1c3aa').split(',').slice(0, 3);
 const AFTER = Math.min(Math.max(+(params.get('after') || 260), 20), 2000);
 const CONC = 3;
+// ?mode=light audits LIGHT_TRIALS (lit deals, #ltrial=) instead of the
+// paper trials (#ptrial=)
+const LIGHT = params.get('mode') === 'light';
+const KEY = LIGHT ? 'ltrial' : 'ptrial';
 
+const LIGHT_NAMES = [
+  'white + teal', 'white + hot pink', 'cobalt + warm white',
+  'emerald + hot pink', 'gold + cobalt', 'coral + aqua',
+  'ultraviolet + acid yellow', 'mint + rose', 'blood red + ice',
+  'turquoise + gold', 'amber + emerald', 'silver (all white)',
+  'peach + periwinkle', 'chartreuse + deep rose', 'cyan + white',
+  'magenta + gold', 'vermilion + cobalt', 'sunset (orange + magenta)',
+  'teal + copper', 'ice + blood red',
+];
 // names mirrored from main.js PAPER_TRIALS for row labels
-const NAMES = [
+const PAPER_NAMES = [
   'india + teal on cream', 'india + flame on kraft', 'india + jade on rose',
   'prussian + india on blue-grey', 'indigo + crimson on ivory',
   'teal + india on cream', 'vermilion + tan on ivory',
@@ -65,9 +78,10 @@ const NAMES = [
   'gold + prussian on ivory', 'gold + hot pink on rose',
   'gold + teal on kraft', 'gold + crimson on ivory',
 ];
+const NAMES = LIGHT ? LIGHT_NAMES : PAPER_NAMES;
 // ?from / ?to select a trial range (default: newest audition block), or
 // ?trials=0,1,4,... names an explicit list — e.g. the graduated PRINTS set
-const FROM = Math.max(+(params.get('from') ?? 20), 0);
+const FROM = Math.max(+(params.get('from') ?? (LIGHT ? 0 : 20)), 0);
 const TO = Math.min(+(params.get('to') ?? NAMES.length - 1), NAMES.length - 1);
 const LIST = params.get('trials')
   ? params.get('trials').split(',').map(Number).filter(t => NAMES[t] !== undefined)
@@ -82,13 +96,13 @@ for(const t of LIST){
   row.className = 'trial';
   const nm = document.createElement('div');
   nm.className = 'tname';
-  nm.innerHTML = `#${t} ${NAMES[t]}<small>#ptrial=${t}</small>`;
+  nm.innerHTML = `#${t} ${NAMES[t]}<small>#${KEY}=${t}</small>`;
   row.append(nm);
   for(const seed of SEEDS){
     const view = document.createElement('div');
     view.className = 'view';
     row.append(view);
-    const c = { url: `index.html#seed=${seed}&ptrial=${t}`, view, idx: cells.length };
+    const c = { url: `index.html#seed=${seed}&${KEY}=${t}`, view, idx: cells.length };
     cells.push(c);
     queue.push(c);
   }

@@ -737,6 +737,31 @@ const PAPER_TRIALS = [
 // for future auditions.
 const PRINTS = [0, 1, 4, 5, 6, 7, 8, 9, 11, 12, 14, 18, 19,
                 23, 25, 28, 30, 31, 33].map(i => PAPER_TRIALS[i]);
+// LIGHT-COMBO TRIALS (dev): #ltrial=N shows the deal LIT with pair N —
+// h the hoop+sun, d the bulb+fill companion. Judged on
+// combos.html?mode=light; winners graduate into NEONS/DUOS.
+const LIGHT_TRIALS = [
+  { h:[1.15,1.12,1.05], d:[0.10,0.95,0.80], n:'white + teal' },
+  { h:[1.15,1.12,1.05], d:[1.15,0.20,0.60], n:'white + hot pink' },
+  { h:[0.25,0.45,1.30], d:[1.10,1.00,0.85], n:'cobalt + warm white' },
+  { h:[0.10,1.10,0.45], d:[1.15,0.20,0.60], n:'emerald + hot pink' },
+  { h:[1.20,0.90,0.25], d:[0.25,0.45,1.30], n:'gold + cobalt' },
+  { h:[1.20,0.45,0.35], d:[0.15,0.95,0.90], n:'coral + aqua' },
+  { h:[0.45,0.15,1.25], d:[1.05,1.05,0.15], n:'ultraviolet + acid yellow' },
+  { h:[0.55,1.10,0.75], d:[1.15,0.45,0.55], n:'mint + rose' },
+  { h:[1.25,0.10,0.12], d:[0.80,0.90,1.15], n:'blood red + ice' },
+  { h:[0.10,0.90,1.00], d:[1.20,0.90,0.25], n:'turquoise + gold' },
+  { h:[1.20,0.75,0.12], d:[0.10,1.10,0.45], n:'amber + emerald' },
+  { h:[1.10,1.08,1.02], d:[0.95,0.98,1.08], n:'silver (all white)' },
+  { h:[1.20,0.65,0.45], d:[0.55,0.60,1.20], n:'peach + periwinkle' },
+  { h:[0.85,1.15,0.10], d:[1.10,0.30,0.45], n:'chartreuse + deep rose' },
+  { h:[0.10,0.85,1.05], d:[1.10,1.05,0.95], n:'cyan + white' },
+  { h:[1.05,0.12,0.62], d:[1.20,0.90,0.25], n:'magenta + gold' },
+  { h:[1.25,0.30,0.10], d:[0.25,0.45,1.30], n:'vermilion + cobalt' },
+  { h:[1.25,0.55,0.10], d:[1.05,0.12,0.62], n:'sunset (orange + magenta)' },
+  { h:[0.10,0.90,0.80], d:[1.15,0.55,0.30], n:'teal + copper' },
+  { h:[0.80,0.90,1.15], d:[1.25,0.10,0.12], n:'ice + blood red' },
+];
 const METALS = [[0.92, 0.94, 0.98],   // silver
                 [1.00, 0.78, 0.38],   // gold
                 [0.98, 0.55, 0.38]];  // copper
@@ -983,6 +1008,15 @@ function randomize(){
     paperCol = PAPERS[T.p];
     inverted = true;
     console.log(`paper trial ${ptm[1]}: ${T.n}`);
+  }
+  // dev override: #ltrial=N shows this deal LIT with light-trial N's pair
+  const ltm = location.hash.match(/ltrial=(\d+)/);
+  if(ltm && LIGHT_TRIALS[+ltm[1]]){
+    const T = LIGHT_TRIALS[+ltm[1]];
+    ringCol = T.h;
+    bulbCol = T.d;
+    inverted = false;
+    console.log(`light trial ${ltm[1]}: ${T.n}`);
   }
   // the white bulb circle: pushed well off-centre — often halfway out the
   // wall — and slanted anywhere from a polite tip to a hard ~64° keel
