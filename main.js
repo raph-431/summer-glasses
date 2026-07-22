@@ -1319,6 +1319,39 @@ function buildAudio(){
   const xtal = ctx.createGain(); xtal.gain.value = 0; xtal.connect(master);
   const xtalState = { on: false };
 
+  // THE ROOM: everything here is otherwise dry sine — a shared reverb
+  // puts all the crystal voices in one dark space. The impulse response
+  // is generated, not sampled: a stereo noise burst dying over ~2.8 s.
+  const verb = ctx.createConvolver();
+  {
+    const len = (ctx.sampleRate*2.8) | 0;
+    const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for(let c = 0; c < 2; c++){
+      const d = ir.getChannelData(c);
+      for(let i = 0; i < len; i++)
+        d[i] = (Math.random()*2 - 1)*Math.pow(1 - i/len, 2.6);
+    }
+    verb.buffer = ir;
+  }
+  const verbG = ctx.createGain(); verbG.gain.value = 0.35;
+  xtal.connect(verb); verb.connect(verbG); verbG.connect(master);
+
+  // AIR: a whisper of dark band-limited noise, wandering slowly — the
+  // spectral glue between the pure tones
+  const airBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate);
+  {
+    const d = airBuf.getChannelData(0);
+    for(let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
+  }
+  const air = ctx.createBufferSource(); air.buffer = airBuf; air.loop = true;
+  const airF = ctx.createBiquadFilter();
+  airF.type = 'bandpass'; airF.frequency.value = 900; airF.Q.value = 0.5;
+  const airG = ctx.createGain(); airG.gain.value = 0.012;
+  const airLfo = ctx.createOscillator(); airLfo.frequency.value = 0.031;
+  const airLfoG = ctx.createGain(); airLfoG.gain.value = 0.006;
+  airLfo.connect(airLfoG); airLfoG.connect(airG.gain); airLfo.start();
+  air.connect(airF); airF.connect(airG); airG.connect(xtal); air.start();
+
   // a whisper of shimmer: struck bells echo into the void once or twice
   const shimmer = ctx.createDelay(1.0); shimmer.delayTime.value = 0.31;
   const shimFb = ctx.createGain(); shimFb.gain.value = 0.34;
@@ -1330,7 +1363,9 @@ function buildAudio(){
   // finger circling) + the wine glass's inharmonic 2.32 partial. The render
   // loop tunes it to the dealt glass — big bowls sing low.
   let singF = 880;
-  const singG = ctx.createGain(); singG.gain.value = 0.05; singG.connect(xtal);
+  const singPan = ctx.createStereoPanner(); singPan.pan.value = -0.25;
+  singPan.connect(xtal);
+  const singG = ctx.createGain(); singG.gain.value = 0.05; singG.connect(singPan);
   const swell = ctx.createGain(); swell.gain.value = 0.55;   // breathes below
   const sLfo = ctx.createOscillator(); sLfo.frequency.value = 0.09;
   const sLfoG = ctx.createGain(); sLfoG.gain.value = 0.38;
@@ -1348,7 +1383,9 @@ function buildAudio(){
   // a SECOND RIM: a companion glass singing a just major third above the
   // first — when both sound, they make a chord. Its own gain gate and its
   // own slower swell; mostly they trade off on independent clocks.
-  const sing2G = ctx.createGain(); sing2G.gain.value = 0; sing2G.connect(xtal);
+  const sing2Pan = ctx.createStereoPanner(); sing2Pan.pan.value = 0.25;
+  sing2Pan.connect(xtal);
+  const sing2G = ctx.createGain(); sing2G.gain.value = 0; sing2G.connect(sing2Pan);
   const swell2 = ctx.createGain(); swell2.gain.value = 0.55;
   const s2Lfo = ctx.createOscillator(); s2Lfo.frequency.value = 0.067;
   const s2LfoG = ctx.createGain(); s2LfoG.gain.value = 0.38;
