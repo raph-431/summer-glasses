@@ -228,14 +228,20 @@ float rivulet(vec2 s){
 // 4 hobnail bead grid, 5 pearl bands, 6 pinstripe grooves (the only
 // negative-relief cut). All share the count/aspect sliders.
 uniform float u_pat;
+uniform float u_patLo;         // coverage band bottom (rolled per deal)
+uniform float u_patHi;         // coverage band top
+uniform float u_patSkew;       // helical lean applied to every pattern (rad/height)
 uniform float u_patTop;        // where the pattern band ends: just below the
                                // rim by default, the shoulder on the bottle
 float facetPattern(float th, float y){
   if(u_pat < 0.5) return 0.0;
+  th += u_patSkew*(y - u_y0);    // per-deal helical lean on every pattern
   float m = u_diamN;             // repeats around the circumference
   // rows track the count so the aspect slider keeps its meaning
   float rows = (3.0 * u_diamN/16.0) / max(u_diam, 0.2);
-  float band = smoothstep(u_y0 + 0.06, u_y0 + 0.18, y) * (1.0 - smoothstep(u_patTop - 0.17, u_patTop, y));
+  // coverage band rolled per deal: full body, lower half, waist belt, or
+  // a plain collar under the rim — like real cut glass
+  float band = smoothstep(u_patLo, u_patLo + 0.12, y) * (1.0 - smoothstep(u_patHi - 0.17, u_patHi, y));
   if(u_pat < 1.5){
     // diamond quilt: two triangle waves in helical coordinates make a
     // lattice of little pyramids = the cut facets
@@ -269,12 +275,28 @@ float facetPattern(float th, float y){
     float R = mix(0.26, 0.46, big);
     return sqrt(max(R*R - dot(g,g), 0.0))/0.46 * 2.2 * band;
   }
-  // pinstripes: very thin vertical lines at 3x the count slider — unlike
-  // every other pattern these are carved INTO the wall (negative height),
-  // each groove a rounded channel, like fine engraved fluting
-  float gx = fract(th*(m*3.0/6.2831853)) - 0.5;
-  float q = clamp(1.0 - (gx/0.10)*(gx/0.10), 0.0, 1.0);
-  return -sqrt(q) * band;
+  if(u_pat < 6.5){
+    // pinstripes: very thin vertical lines at 3x the count slider — unlike
+    // most patterns these are carved INTO the wall (negative height),
+    // each groove a rounded channel, like fine engraved fluting
+    float gx = fract(th*(m*3.0/6.2831853)) - 0.5;
+    float q = clamp(1.0 - (gx/0.10)*(gx/0.10), 0.0, 1.0);
+    return -sqrt(q) * band;
+  }
+  if(u_pat < 7.5){
+    // flat-cut panels: a few wide flats meeting at sharp creases — each
+    // flat is one big lens (bold caustic petals; the creases blaze with
+    // diamond fire). Carved into the wall (negative), so kept moderate.
+    float mp = floor(clamp(m*0.4, 5.0, 12.0) + 0.5);
+    float alpha = 3.14159265/mp;
+    float phl = (fract(th*mp/6.2831853) - 0.5)*2.0*alpha;
+    return (cos(alpha)/max(cos(phl), 0.5) - 1.0)/(1.0 - cos(alpha)) * band;
+  }
+  // starburst base: radial ridges fanning up from the foot — they carve
+  // the contact ring's hot caustic into spokes, fading out by mid-body.
+  // A base treatment: it uses its own envelope, not the coverage band.
+  float sf = 1.0 - smoothstep(u_y0 + 0.02, u_y0 + 0.40*max(u_H - u_y0, 0.2), y);
+  return pow(max(0.5 + 0.5*cos(th*m), 0.0), 2.0) * sf;
 }
 float patAmp(){
   // cut depth per pattern: beads bulge more than cut facets
@@ -282,7 +304,9 @@ float patAmp(){
   if(u_pat < 3.5) return 0.014;
   if(u_pat < 4.5) return 0.020;
   if(u_pat < 5.5) return 0.012;  // fine pearls sit shallower than hobnail
-  return 0.006;      // pinstripe grooves: shallow, so they never breach the wall
+  if(u_pat < 6.5) return 0.006;  // pinstripe grooves: shallow, never breach
+  if(u_pat < 7.5) return 0.012;  // flat panels: carved, kept off the wall floor
+  return 0.014;                  // base star ridges
 }
 // manufacturing irregularity, shared by BOTH wall surfaces (a slumped glass
 // deforms as a whole): wobble wisps + past irr = 1 a gentle ovality. Keeping

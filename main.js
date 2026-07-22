@@ -664,6 +664,8 @@ let paintSunAz = 0.8, paintSunEl = 0.9;
 let metal = 0, metalSeed = 0, metalCol = [0.92, 0.94, 0.98];
 let metalScale = 3, metalWarp = 1;   // blotch size + how stringy they smear
 let metalType = 1;   // 0 winding bands, 1 splashes, 2 spots, 3 filaments
+// pattern coverage band + helical lean — rolled per deal in randomize()
+let patLo = 0.06, patHi = 1.0, patSkew = 0;
 const METALS = [[0.92, 0.94, 0.98],   // silver
                 [1.00, 0.78, 0.38],   // gold
                 [0.98, 0.55, 0.38]];  // copper
@@ -775,11 +777,29 @@ function randomize(){
   // pairing is parked with realism — and the pattern dials thrown wide:
   // deeper cuts, giant-to-hairline repeat counts, squashed-to-stretched
   // aspects. Extremes may flirt with raymarch artifacts; that's the deal.
-  set('pat', String(Math.floor(r()*7)));
+  set('pat', String(Math.floor(r()*9)));   // + flat panels (7), base star (8)
   set('facet', rng(r, 0.3, 2.4).toFixed(2));
   set('diam', rng(r, 0.3, 3.0).toFixed(2));
   set('diamN', Math.round(rng(r, 5, 48)));
   set('disp', rng(r, 0.1, 1.4).toFixed(2));
+  // pattern coverage: like real cut glass, the treatment doesn't always
+  // run the whole body — full / lower half / waist belt / plain collar
+  {
+    const pTop = shape.patTop ?? shape.H - 0.18;
+    const pBase = shape.y0 + 0.06;
+    const span = Math.max(pTop - pBase, 0.1);
+    const cv = r();
+    if(cv < 0.45){      patLo = pBase;              patHi = pTop; }
+    else if(cv < 0.65){ patLo = pBase;              patHi = pBase + 0.55*span; }
+    else if(cv < 0.85){ patLo = pBase + 0.28*span;  patHi = pBase + 0.72*span; }
+    else{               patLo = pBase;              patHi = pTop - 0.25*span; }
+  }
+  // helical lean: 40% of deals shear their pattern into a slight spiral
+  // (fixed draw count so seeds stay stable)
+  {
+    const s1 = r(), s2 = r(), s3 = r();
+    patSkew = s1 < 0.6 ? 0 : (s2 < 0.5 ? -1 : 1)*(0.15 + 0.75*s3);
+  }
 
   // crystal: harder refraction, real fire, deep cuts. EXPERIMENT: half of
   // ALL bodies are crystal (no stemware bias), and COLOURED crystal is
@@ -1236,6 +1256,9 @@ function frame(){
     gl.uniform1f(u.u_diamN, parseFloat($('diamN').value));
     gl.uniform1f(u.u_pat, parseFloat($('pat').value));
     gl.uniform1f(u.u_patTop, shape.patTop ?? shape.H - 0.18);
+    gl.uniform1f(u.u_patLo, patLo);
+    gl.uniform1f(u.u_patHi, patHi);
+    gl.uniform1f(u.u_patSkew, patSkew);
     gl.uniform1f(u.u_cond, cond);
     gl.uniform1f(u.u_irr, parseFloat($('irr').value));
     gl.uniform3f(u.u_liqSig, ...colaSig);
