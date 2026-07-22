@@ -493,7 +493,7 @@ const DUOS = [
   [0.15, 0.95, 0.75],   // magenta    → teal
   [1.00, 0.62, 0.10],   // cyan       → amber
   [0.35, 0.65, 1.10],   // amber      → ice blue
-  [0.55, 0.25, 1.10],   // acid green → violet
+  [1.05, 0.12, 0.62],   // acid green → magenta
   [0.10, 0.85, 1.05],   // red-orange → cyan
   [1.05, 0.52, 0.10],   // violet     → warm orange
   [1.05, 0.45, 0.75],   // ice blue   → pink
