@@ -677,9 +677,6 @@ const PAPERS = [
   [0.98, 0.92, 0.82],   // light kraft
 ];
 let inverted = false, paperCol = PAPERS[0];
-// mug handle (light painting only, testing at 50%): visible, optically
-// silent — anchors as fractions of the body, bulge and tube per deal
-let hasHandle = false, hAz = 0, hTopF = 0.72, hBotF = 0.30, hBulge = 1.1, hTube = 0.07;
 const METALS = [[0.92, 0.94, 0.98],   // silver
                 [1.00, 0.78, 0.38],   // gold
                 [0.98, 0.55, 0.38]];  // copper
@@ -814,17 +811,10 @@ function randomize(){
     const s1 = r(), s2 = r(), s3 = r();
     patSkew = s1 < 0.8 ? 0 : (s2 < 0.5 ? -1 : 1)*(0.15 + 0.75*s3);
   }
-  // the negative print: ~30% of deals are inked on paper instead of lit,
+  // the negative print: half the deals are inked on paper instead of lit,
   // each on a rolled stock from the paper drawer
-  inverted = r() < 0.30;
+  inverted = r() < 0.50;
   paperCol = pick(r, PAPERS);
-  // the handle: half of all deals while we evaluate the look
-  hasHandle = r() < 0.50;
-  hAz = r()*6.2832;
-  hTopF = rng(r, 0.62, 0.80);
-  hBotF = rng(r, 0.22, 0.38);
-  hBulge = rng(r, 1.0, 1.3);
-  hTube = rng(r, 0.055, 0.10);   // × maxR
 
   // crystal: harder refraction, real fire, deep cuts. EXPERIMENT: half of
   // ALL bodies are crystal (no stemware bias), and COLOURED crystal is
@@ -1605,17 +1595,6 @@ function frame(){
   gl.uniform1f(uC.u_table, parseFloat($('table').value));
   gl.uniform1f(uC.u_tabRot, tabRot);
   gl.uniform1f(uC.u_arty, lightPaint ? 1 : 0);
-  // the handle: anchors on the wall at two heights, arc centred between
-  // them at the mid wall radius, ends diving inward past the clamp
-  {
-    const hy1 = shape.y0 + hTopF*(shape.H - shape.y0);
-    const hy2 = shape.y0 + hBotF*(shape.H - shape.y0);
-    gl.uniform1f(uC.u_hOn, (lightPaint && hasHandle) ? 1 : 0);
-    gl.uniform1f(uC.u_hAz, hAz);
-    gl.uniform2f(uC.u_hC, (profR(hy1) + profR(hy2))/2 + wallv*0.3, (hy1 + hy2)/2);
-    gl.uniform1f(uC.u_hR, (hy1 - hy2)/2*hBulge);
-    gl.uniform1f(uC.u_hT, hTube*maxR);
-  }
   gl.uniform3fv(uC.u_ringC, ringCArr);
   gl.uniform3fv(uC.u_ringU, ringUArr);
   gl.uniform3fv(uC.u_ringV, ringVArr);
