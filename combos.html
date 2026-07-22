@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>summer glasses — paper combo trials</title>
+<!-- Dev tool: renders every PAPER_TRIALS combo (see main.js) as a negative
+     print across the same few glasses — 20 rows x 3 seeds. Same snapshot
+     machinery as contact.html; ?seeds=a,b,c and ?after=frames to tune. -->
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0a0a0c; color: #cfcfd6;
+         font: 13px/1.4 ui-monospace, Menlo, monospace; }
+  header { display: flex; align-items: baseline; gap: 14px;
+           padding: 12px 16px; position: sticky; top: 0;
+           background: #0a0a0cee; z-index: 2; }
+  h1 { font-size: 14px; font-weight: 600; margin: 0; letter-spacing: 0.04em; }
+  #st { color: #8a8a94; }
+  #rows { display: flex; flex-direction: column; gap: 14px; padding: 0 16px 24px; }
+  .trial { display: grid; grid-template-columns: 210px repeat(3, 1fr); gap: 10px;
+           align-items: center; }
+  .tname { color: #b9b9c4; }
+  .tname small { display: block; color: #66666e; }
+  .view { position: relative; aspect-ratio: 8/5; background: #111;
+          border-radius: 3px; overflow: hidden; }
+  .view iframe, .view img { position: absolute; inset: 0;
+          width: 100%; height: 100%; border: 0; display: block; object-fit: cover; }
+  .shield { position: absolute; inset: 0; }
+  .view a { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>paper combo trials</h1>
+  <span id="st"></span>
+  <span style="color:#55555e">?from=&amp;to= picks the trial range (default: newest block) — click a print to open it live</span>
+</header>
+<div id="rows"></div>
+<script>
+'use strict';
+const params = new URLSearchParams(location.search);
+const SEEDS = (params.get('seeds') || 'cafe1234,7b1ce995,40d1c3aa').split(',').slice(0, 3);
+const AFTER = Math.min(Math.max(+(params.get('after') || 260), 20), 2000);
+const CONC = 3;
+// ?mode=light audits LIGHT_TRIALS (lit deals, #ltrial=) instead of the
+// paper trials (#ptrial=)
+const LIGHT = params.get('mode') === 'light';
+const KEY = LIGHT ? 'ltrial' : 'ptrial';
+
+const LIGHT_NAMES = [
+  'white + teal', 'white + hot pink', 'cobalt + warm white',
+  'emerald + hot pink', 'gold + cobalt', 'coral + aqua',
+  'ultraviolet + acid yellow', 'mint + rose', 'blood red + ice',
+  'turquoise + gold', 'amber + emerald', 'silver (all white)',
+  'peach + periwinkle', 'chartreuse + deep rose', 'cyan + white',
+  'magenta + gold', 'vermilion + cobalt', 'sunset (orange + magenta)',
+  'teal + copper', 'ice + blood red',
+];
+// names mirrored from main.js PAPER_TRIALS for row labels
+const PAPER_NAMES = [
+  'india + teal on cream', 'india + flame on kraft', 'india + jade on rose',
+  'prussian + india on blue-grey', 'indigo + crimson on ivory',
+  'teal + india on cream', 'vermilion + tan on ivory',
+  'vermilion + india on blue-grey', 'jade + crimson on cream',
+  'violet-blue + teal on rose', 'sepia + india on kraft',
+  'cyan + violet-blue on ivory', 'prussian + india on rose',
+  'india + chartreuse on kraft', 'rose-madder + india on cream',
+  'amber + teal on cream', 'teal + sepia on ivory',
+  'violet-blue + india on ivory', 'tan + cyan on blue-grey',
+  'slate + crimson on rose',
+  // round two: orange / aqua / hot pink / gold
+  'orange + india on cream', 'orange + aqua on ivory',
+  'orange + prussian on blue-grey', 'orange + hot pink on rose',
+  'aqua + india on cream', 'aqua + orange on kraft',
+  'aqua + hot pink on ivory', 'hot pink + india on cream',
+  'hot pink + gold on ivory', 'hot pink + aqua on blue-grey',
+  'hot pink + orange on rose', 'gold + india on cream',
+  'gold + prussian on ivory', 'gold + hot pink on rose',
+  'gold + teal on kraft', 'gold + crimson on ivory',
+];
+const NAMES = LIGHT ? LIGHT_NAMES : PAPER_NAMES;
+// ?from / ?to select a trial range (default: newest audition block), or
+// ?trials=0,1,4,... names an explicit list — e.g. the graduated PRINTS set
+const FROM = Math.max(+(params.get('from') ?? (LIGHT ? 0 : 20)), 0);
+const TO = Math.min(+(params.get('to') ?? NAMES.length - 1), NAMES.length - 1);
+const LIST = params.get('trials')
+  ? params.get('trials').split(',').map(Number).filter(t => NAMES[t] !== undefined)
+  : Array.from({length: TO - FROM + 1}, (_, i) => FROM + i);
+
+const rows = document.getElementById('rows'), st = document.getElementById('st');
+const cells = [], queue = [];
+let active = 0, done = 0;
+
+for(const t of LIST){
+  const row = document.createElement('div');
+  row.className = 'trial';
+  const nm = document.createElement('div');
+  nm.className = 'tname';
+  nm.innerHTML = `#${t} ${NAMES[t]}<small>#${KEY}=${t}</small>`;
+  row.append(nm);
+  for(const seed of SEEDS){
+    const view = document.createElement('div');
+    view.className = 'view';
+    row.append(view);
+    const c = { url: `index.html#seed=${seed}&${KEY}=${t}`, view, idx: cells.length };
+    cells.push(c);
+    queue.push(c);
+  }
+  rows.append(row);
+}
+
+function pump(){
+  while(active < CONC && queue.length){
+    const c = queue.shift();
+    active++;
+    const f = document.createElement('iframe');
+    f.src = c.url;
+    const shield = document.createElement('div');
+    shield.className = 'shield';
+    c.view.append(f, shield);
+    c.frame = f;
+    f.addEventListener('load', () => {
+      setTimeout(() => f.contentWindow.postMessage(
+        { type: 'summer-glass-snapshot-request', id: c.idx,
+          quality: 0.85, after: AFTER }, '*'), 50);
+    });
+  }
+  st.textContent = done + '/' + cells.length;
+}
+
+addEventListener('message', e => {
+  const d = e.data;
+  if(!d || d.type !== 'summer-glass-snapshot') return;
+  const c = cells[d.id];
+  if(!c || !c.frame) return;
+  c.view.innerHTML = '';
+  if(d.jpeg){
+    const img = new Image();
+    img.src = d.jpeg;
+    c.view.append(img);
+    const a = document.createElement('a');
+    a.href = c.url;
+    a.target = '_blank';
+    c.view.append(a);
+  } else {
+    c.view.textContent = d.error || 'snapshot failed';
+  }
+  c.frame = null;
+  active--;
+  done++;
+  pump();
+});
+
+pump();
+</script>
+</body>
+</html>

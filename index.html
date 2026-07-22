@@ -38,7 +38,11 @@
     user-select:none;
   }
   #corner button:hover { color:rgba(255,255,255,.9); }
-  #audioBtn.on { color:rgba(255,235,200,.95); }
+  #audioBtn.on, #orbitBtn.on { color:rgba(255,235,200,.95); }
+  /* paper prints: ink-dark buttons on the light stock */
+  body.paper #corner button { color:rgba(25,22,18,.60); text-shadow:0 1px 8px rgba(255,255,255,.45); }
+  body.paper #corner button:hover { color:rgba(25,22,18,.9); }
+  body.paper #audioBtn.on, body.paper #orbitBtn.on { color:rgba(150,95,25,.95); }
   #infoPanel {
     position:fixed; right:22px; bottom:52px; z-index:2; display:none;
     font:13px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -71,6 +75,7 @@
 <div id="err">This demo needs WebGL2 with float render targets.</div>
 <div id="legend"></div>
 <div id="corner">
+  <button id="orbitBtn" title="slowly circle the glass">auto-orbit</button>
   <button id="shotBtn" title="save this frame as a picture">download</button>
   <button id="infoBtn">info</button>
   <button id="audioBtn">sound on/off</button>
@@ -94,7 +99,7 @@
       <option value="alembic">alembic</option>
       <option value="bottle">wine bottle</option>
     </select></label>
-    <label><span>glass depth</span><input id="wall" type="range" min="0.020" max="0.100" step="0.001" value="0.045"></label>
+    <label><span>glass depth</span><input id="wall" type="range" min="0.008" max="0.220" step="0.001" value="0.045"></label>
     <label><span>glass tint</span><input id="glassCol" type="color" value="#eefbf1"></label>
     <label><span>irregularity</span><input id="irr" type="range" min="0" max="1.5" step="0.01" value="1"></label>
     <label><span>glass bubbles</span><input id="bub" type="range" min="0" max="1" step="0.01" value="0"></label>
@@ -110,10 +115,12 @@
       <option value="4">hobnail</option>
       <option value="5">pearl bands</option>
       <option value="6">pinstripes</option>
+      <option value="7">flat panels</option>
+      <option value="8">base star</option>
     </select></label>
-    <label><span>facet depth</span><input id="facet" type="range" min="0" max="2" step="0.01" value="1"></label>
-    <label><span>pattern aspect</span><input id="diam" type="range" min="0.4" max="2.5" step="0.01" value="1" title="tall vs wide / twist"></label>
-    <label><span>pattern count</span><input id="diamN" type="range" min="6" max="32" step="1" value="16"></label>
+    <label><span>facet depth</span><input id="facet" type="range" min="0" max="2.6" step="0.01" value="1"></label>
+    <label><span>pattern aspect</span><input id="diam" type="range" min="0.25" max="3.2" step="0.01" value="1" title="tall vs wide / twist"></label>
+    <label><span>pattern count</span><input id="diamN" type="range" min="4" max="48" step="1" value="16"></label>
     <label><span>dispersion</span><input id="disp" type="range" min="0" max="2" step="0.01" value="0.5"></label>
   </div>
   <div class="grp"><h2>liquid</h2>
@@ -182,6 +189,7 @@
 </div>
 
 <script src="shaders.js"></script>
+<script src="taste.js"></script>
 <script src="main.js"></script>
 <script src="haiku.js"></script> <!-- dev-only caption layer; excluded from the minted build -->
 </body>
