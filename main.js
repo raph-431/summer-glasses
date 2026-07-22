@@ -1383,6 +1383,25 @@ function buildAudio(){
 
   return { ctx, master, rustle, cicG, criG, birdG, xtal, xtalState, sing };
 }
+// snap the mix to the CURRENT world instantly — used when sound is first
+// enabled, where the gentle frame-loop crossfade would leak the wrong
+// world through the master's fade-up (cicadas in the void)
+function snapAudioWorld(){
+  const n0 = AU.ctx.currentTime;
+  for(const g of [AU.cicG, AU.criG, AU.birdG, AU.rustle, AU.xtal])
+    g.gain.cancelScheduledValues(n0);
+  if(lightPaint){
+    AU.cicG.gain.setValueAtTime(0, n0);
+    AU.criG.gain.setValueAtTime(0, n0);
+    AU.birdG.gain.setValueAtTime(0, n0);
+    AU.rustle.gain.setValueAtTime(0, n0);
+    AU.xtal.gain.setValueAtTime(0.9, n0);
+    AU.xtalState.on = true;
+  } else {
+    AU.xtal.gain.setValueAtTime(0, n0);
+    AU.xtalState.on = false;
+  }
+}
 // auto-orbit: a slow lap of the glass (~60 s per revolution). It nudges
 // the same smoothed target the mouse drags, so grabbing the canvas
 // mid-orbit works naturally — the lap resumes from wherever you let go.
@@ -1397,6 +1416,7 @@ audioBtn.addEventListener('click', () => {
   if(!AU){ AU = buildAudio(); }
   if(AU.ctx.state === 'suspended') AU.ctx.resume();
   const on = audioBtn.classList.toggle('on');
+  if(on) snapAudioWorld();   // no cicada leak while the master fades up
   AU.master.gain.setTargetAtTime(on ? 0.45 : 0.0, AU.ctx.currentTime, 0.4);
 });
 
