@@ -1348,7 +1348,7 @@ function buildAudio(){
   // the FLOOR: a sub-drone two octaves under the rim note — the "large
   // dark room" the long exposure implies. Two whisker-detuned sines,
   // breathing slower than the rim's swell.
-  const subG = ctx.createGain(); subG.gain.value = 0.11; subG.connect(xtal);
+  const subG = ctx.createGain(); subG.gain.value = 0.065; subG.connect(xtal);
   const subSwell = ctx.createGain(); subSwell.gain.value = 0.70;
   const subLfo = ctx.createOscillator(); subLfo.frequency.value = 0.05;
   const subLfoG = ctx.createGain(); subLfoG.gain.value = 0.25;
