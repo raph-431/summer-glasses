@@ -684,6 +684,33 @@ let inverted = false, paperCol = PAPERS[0];
 // papers that flatter each hue's INK (a negative prints the complement):
 // indices into PAPERS, curated per hoop colour. Born from a bad print —
 // amber's blue ink on greenish cream turned to olive mush.
+// PAPER-COMBO TRIALS (dev): #ptrial=N forces the deal to print as a
+// negative with trial N's lights — h becomes the hoop+sun, d the bulb+
+// fill, p indexes PAPERS. Designed in INK space (a negative prints the
+// complement): names describe the inks you'll see. Judged on combos.html;
+// winners graduate into NEONS/DUOS/PAPER_FOR.
+const PAPER_TRIALS = [
+  { h:[1.04,1.01,0.96], d:[1.05,0.22,0.15], p:0, n:'india + teal on cream' },
+  { h:[1.04,1.01,0.96], d:[0.10,0.85,1.05], p:5, n:'india + flame on kraft' },
+  { h:[1.04,1.01,0.96], d:[1.05,0.45,0.75], p:3, n:'india + jade on rose' },
+  { h:[1.00,0.62,0.10], d:[1.02,1.00,0.96], p:2, n:'prussian + india on blue-grey' },
+  { h:[1.05,0.45,0.08], d:[0.15,0.95,0.75], p:1, n:'indigo + crimson on ivory' },
+  { h:[1.05,0.22,0.15], d:[1.02,1.00,0.96], p:0, n:'teal + india on cream' },
+  { h:[0.10,0.85,1.05], d:[0.35,0.65,1.10], p:1, n:'vermilion + tan on ivory' },
+  { h:[0.10,0.85,1.05], d:[1.02,1.00,0.96], p:2, n:'vermilion + india on blue-grey' },
+  { h:[1.05,0.45,0.75], d:[0.15,0.95,0.75], p:0, n:'jade + crimson on cream' },
+  { h:[1.00,0.80,0.30], d:[1.05,0.22,0.15], p:3, n:'violet-blue + teal on rose' },
+  { h:[0.55,0.75,1.05], d:[1.02,1.00,0.96], p:5, n:'sepia + india on kraft' },
+  { h:[1.10,0.15,0.20], d:[1.00,0.80,0.30], p:1, n:'cyan + violet-blue on ivory' },
+  { h:[1.00,0.62,0.10], d:[1.02,1.00,0.96], p:3, n:'prussian + india on rose' },
+  { h:[1.02,1.00,0.95], d:[0.55,0.25,1.10], p:5, n:'india + chartreuse on kraft' },
+  { h:[0.10,0.60,0.55], d:[1.02,1.00,0.96], p:0, n:'rose-madder + india on cream' },
+  { h:[0.40,0.55,1.05], d:[1.05,0.22,0.15], p:0, n:'amber + teal on cream' },
+  { h:[1.10,0.35,0.30], d:[0.55,0.75,1.05], p:1, n:'teal + sepia on ivory' },
+  { h:[1.00,0.80,0.30], d:[1.02,1.00,0.96], p:1, n:'violet-blue + india on ivory' },
+  { h:[0.35,0.65,1.10], d:[1.10,0.15,0.20], p:2, n:'tan + cyan on blue-grey' },
+  { h:[1.05,0.60,0.45], d:[0.15,0.95,0.75], p:3, n:'slate + crimson on rose' },
+];
 const PAPER_FOR = [
   [3, 0, 2],   // magenta    → green ink:      rose / cream / blue-grey
   [0, 1, 5],   // cyan       → flame ink:      cream / ivory / kraft
@@ -923,6 +950,19 @@ function randomize(){
   metalType = Math.floor(r()*4);       // bands / splashes / spots / filaments
   // the lone bulb wears the hoop's curated duo colour (metals stay metals)
   bulbCol = DUOS[hoopIdx];
+  // dev override: #ptrial=N prints this deal with trial N's combo,
+  // whatever else was rolled. Placed AFTER every colour assignment it
+  // overrides (ringCol, bulbCol via DUOS, paper); consumes no rng, so
+  // the same seed compares cleanly across trials.
+  const ptm = location.hash.match(/ptrial=(\d+)/);
+  if(ptm && PAPER_TRIALS[+ptm[1]]){
+    const T = PAPER_TRIALS[+ptm[1]];
+    ringCol = T.h;
+    bulbCol = T.d;
+    paperCol = PAPERS[T.p];
+    inverted = true;
+    console.log(`paper trial ${ptm[1]}: ${T.n}`);
+  }
   // the white bulb circle: pushed well off-centre — often halfway out the
   // wall — and slanted anywhere from a polite tip to a hard ~64° keel
   // (pow-biased: usually moderate, sometimes steep)
