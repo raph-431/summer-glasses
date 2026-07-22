@@ -682,6 +682,19 @@ const DUOS = [
   [1.15, 0.55, 0.30],   // teal          → copper
   [1.25, 0.10, 0.12],   // ice           → blood red
 ];
+// display names for the info panel / $features — index-parallel with the
+// tables above (and PAPERS / METALS / the metal-type order in metalAt)
+const NEON_NAMES = ['magenta','cyan','amber','acid green','red-orange','violet',
+  'ice blue','pink','white','gold','coral','mint','blood red','peach',
+  'vermilion','sunset orange','teal','ice'];
+const DUO_NAMES = ['teal','amber','ice blue','magenta','cyan','warm orange',
+  'pink','cyan','hot pink','cobalt','aqua','rose','ice','periwinkle',
+  'cobalt','magenta','copper','blood red'];
+const PAPER_NAMES = ['cream','warm ivory','blue-grey','pale rose','sage','light kraft'];
+const METAL_NAMES = ['silver','gold','copper'];
+const METAL_TYPE_NAMES = ['winding bands','splashes','spots','filaments'];
+// deal facts captured for the info panel (set in randomize)
+let shapeDesc = '', patCoverName = 'full body', metalIdx = 0, litName = null;
 // a bare distant sun over the void (slot 2): classical parallel-ray caustic
 // cutting across the hoop's mandala. Warm white; pose rolled per deal.
 let paintSunAz = 0.8, paintSunEl = 0.9;
@@ -823,6 +836,7 @@ function randomize(){
     shapeName = fam === 'vessel' ? 'highball' : 'wine';
     $('shape').value = shapeName;
     $('wall').value = shape.wall;
+    shapeDesc = `neural-bred ${fam} · critic ${bred.score.toFixed(2)}`;
     console.log(`bred ${fam} — critic score ${bred.score.toFixed(3)}`);
   } else {
   // EXPERIMENT: crossbred vessels. Two parent families blend — knots,
@@ -856,6 +870,8 @@ function randomize(){
   shapeName = tb < 0.5 ? nameA : nameB;        // the dominant parent names it
   $('shape').value = shapeName;
   $('wall').value = shape.wall;
+  shapeDesc = tb === 0 ? `preset · ${nameA}`
+            : `crossbred · ${nameA} × ${nameB} (${Math.round(tb*100)}% ${nameB})`;
   // jitter the knots, delta-clamped so the raymarcher stays stable. The
   // AMOUNT is itself a per-deal roll, cubically biased: most deals stay a
   // civilized ±5–8%, a tail reaches ±20% — the wonky hand-blown outliers
@@ -907,10 +923,10 @@ function randomize(){
     const pBase = shape.y0 + 0.06;
     const span = Math.max(pTop - pBase, 0.1);
     const cv = r();
-    if(cv < 0.45){      patLo = pBase;              patHi = pTop; }
-    else if(cv < 0.65){ patLo = pBase;              patHi = pBase + 0.55*span; }
-    else if(cv < 0.85){ patLo = pBase + 0.28*span;  patHi = pBase + 0.72*span; }
-    else{               patLo = pBase;              patHi = pTop - 0.25*span; }
+    if(cv < 0.45){      patLo = pBase;              patHi = pTop;               patCoverName = 'full body'; }
+    else if(cv < 0.65){ patLo = pBase;              patHi = pBase + 0.55*span;  patCoverName = 'lower half'; }
+    else if(cv < 0.85){ patLo = pBase + 0.28*span;  patHi = pBase + 0.72*span;  patCoverName = 'waist belt'; }
+    else{               patLo = pBase;              patHi = pTop - 0.25*span;   patCoverName = 'plain collar'; }
   }
   // helical lean: 20% of deals shear their pattern into a slight spiral
   // (fixed draw count so seeds stay stable)
@@ -1012,7 +1028,8 @@ function randomize(){
   // splashed metal: three quarters of the deals wear some
   metal = r() < 0.75 ? rng(r, 0.15, 0.65) : 0;
   metalSeed = r()*100;
-  metalCol = pick(r, METALS);
+  metalIdx = Math.min(Math.floor(r()*METALS.length), METALS.length - 1);
+  metalCol = METALS[metalIdx];   // same single draw pick() used to consume
   metalScale = 1.8*Math.exp(r()*1.5);  // log-uniform 1.8–8: islands..speckle
   metalWarp = rng(r, 0.0, 2.2);        // 0 round blobs .. stringy splatter
   metalType = Math.floor(r()*4);       // bands / splashes / spots / filaments
@@ -1024,20 +1041,23 @@ function randomize(){
   // the same seed compares cleanly across trials.
   const ptm = location.hash.match(/ptrial=(\d+)/);
   if(ptm && PAPER_TRIALS[+ptm[1]]){
-    const T = PAPER_TRIALS[+ptm[1]];
-    ringCol = T.h;
-    bulbCol = T.d;
-    paperCol = PAPERS[T.p];
+    printPick = PAPER_TRIALS[+ptm[1]];   // the info panel names the trial too
+    ringCol = printPick.h;
+    bulbCol = printPick.d;
+    paperCol = PAPERS[printPick.p];
     inverted = true;
-    console.log(`paper trial ${ptm[1]}: ${T.n}`);
+    console.log(`paper trial ${ptm[1]}: ${printPick.n}`);
   }
   // dev override: #ltrial=N shows this deal LIT with light-trial N's pair
+  litName = null;
   const ltm = location.hash.match(/ltrial=(\d+)/);
   if(ltm && LIGHT_TRIALS[+ltm[1]]){
     const T = LIGHT_TRIALS[+ltm[1]];
     ringCol = T.h;
     bulbCol = T.d;
     inverted = false;
+    printPick = null;
+    litName = T.n;
     console.log(`light trial ${ltm[1]}: ${T.n}`);
   }
   // the white bulb circle: pushed well off-centre — often halfway out the
@@ -1064,16 +1084,23 @@ function randomize(){
   wPh0 = r()*6.2832;                         // where on the circle it hangs
   // machine-readable deal summary for marketplaces/indexers (same wording
   // as the info panel)
+  // machine-readable deal summary — the light-painting vocabulary (the
+  // old drink/time-of-day fields described the realistic render)
+  const patName = selText('pat');
   window.$features = {
-    drink:     selText('liquid'),
-    glassware: (bred ? `bred ${bred.fam} ` : '') + (isCrystal ? 'crystal ' : '') + selText('shape'),
-    pattern:   selText('pat'),
-    timeOfDay: selText('tod'),
-    canopy:    selText('canopy'),
-    table:     selText('table'),
-    ice:       +$('ice').value,
+    render:  inverted ? 'paper print' : 'light painting',
+    shape:   shapeDesc,
+    body:    isCrystal ? 'crystal' : 'glass',
+    colors:  printPick ? printPick.n
+           : (litName ?? `${NEON_NAMES[hoopIdx]} + ${DUO_NAMES[hoopIdx]}`),
+    metal:   metal > 0
+           ? `${METAL_NAMES[metalIdx]} ${METAL_TYPE_NAMES[metalType]} · ${Math.round(metal*100)}% cover`
+           : 'none',
+    pattern: patName === 'smooth' ? 'smooth'
+           : patName + ' · ' + patCoverName
+             + (patSkew ? (patSkew > 0 ? ' · leaning cw' : ' · leaning ccw') : ''),
   };
-  if(printPick) window.$features.print = printPick.n;   // negative-deal ink combo
+  if(printPick) window.$features.paper = PAPER_NAMES[printPick.p];
   window.onDeal?.();   // optional hook — haiku.js captions the deal if loaded
   if(infoPanel.style.display === 'block') fillInfo();
 }
@@ -1082,11 +1109,11 @@ function randomize(){
 const infoPanel = $('infoPanel');
 const selText = id => { const s = $(id); return s.options[s.selectedIndex].text; };
 function fillInfo(){
-  infoPanel.innerHTML =
-    `<div><span>drink</span>${selText('liquid')}</div>` +
-    `<div><span>glassware</span>${isCrystal ? 'crystal ' : ''}${selText('shape')}</div>` +
-    `<div><span>pattern</span>${selText('pat')}</div>` +
-    `<div><span>time of day</span>${selText('tod')}</div>`;
+  // rendered straight from $features, so the panel can never drift from
+  // what indexers see
+  infoPanel.innerHTML = Object.entries(window.$features || {})
+    .map(([k, v]) => `<div><span>${k}</span>${v}</div>`)
+    .join('');
 }
 // same capture the S key uses — the frame has to be grabbed inside the
 // render loop, so this only raises the flag
