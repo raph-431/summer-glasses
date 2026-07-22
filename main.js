@@ -568,6 +568,14 @@ function randomize(){
     const d = shape.prof[i] - shape.prof[i-1];
     shape.prof[i] = shape.prof[i-1] + Math.min(Math.max(d, d0 - 0.05), d0 + 0.05);
   }
+  // the foot must carry the bowl: crossbreeding could hand a huge upper
+  // body a doll's foot. Scale the foot (and a touch of the stem) to the
+  // bowl's widest point — martini-like proportions at the minimum.
+  if(shape.y0 > 0){
+    const bowlR = Math.max(...shape.prof);
+    shape.footR = Math.max(shape.footR, 0.60*bowlR);
+    shape.stemR = Math.max(shape.stemR, 0.075*bowlR);
+  }
   // EXPERIMENT: wall thickness thrown wide too — from near-lab-glass thin
   // to half-solid slabs (thick walls are giant lenses: long glass chords,
   // heavy refraction, the fattest caustic folds in the piece)
