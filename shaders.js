@@ -1356,6 +1356,26 @@ void main(){
       hitA = min(hitA, tGlass);
       vec3 P = ro + rd*tGlass;
       vec3 N = glassNormal(P);
+      // the floor and base as a LENS: on upward-facing glass the straight-
+      // through sample lands in the base's own umbra (black by honest
+      // physics). Refract into the slab instead and read the caustic where
+      // the bent ray meets the table — warped, magnified filaments, tinted
+      // by the glass body on the way through. (One knowing lie: the second
+      // interface at the slab's underside is skipped.)
+      float bot = smoothstep(0.35, 0.75, N.y);
+      if(bot > 0.01){
+        vec3 dl = refract(rd, N, 1.0/u_nGlass);
+        if(dot(dl,dl) > 0.1 && dl.y < -0.02){
+          float tl = -P.y/dl.y;
+          vec2 cuv2 = ((P + dl*tl).xz - u_caustC)/u_caustS*0.5 + 0.5;
+          if(all(greaterThan(cuv2, vec2(0.0))) && all(lessThan(cuv2, vec2(1.0)))){
+            vec3 lensC = pow(max(texture(u_caust, cuv2).rgb*1.45
+                              + texture(u_caustB, cuv2).rgb*0.35, vec3(0.0)), vec3(0.88));
+            lensC *= exp(-tl*u_glassSig*0.8);
+            colA = mix(colA, lensC, bot);
+          }
+        }
+      }
       float fres = pow(clamp(1.0 + dot(rd, N), 0.0, 1.0), 3.0);
       float fp = facetPattern(atan(P.z, P.x), clamp(P.y, 0.0, u_H));
       // the vessel drawn only where it grazes the eye: a cold rim above the
