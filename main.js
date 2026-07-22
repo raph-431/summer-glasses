@@ -1542,50 +1542,6 @@ function buildAudio(){
   }
   setTimeout(motif, 6000 + Math.random()*6000);
 
-  // STRING SWELLS: a slow harmonic tide every minute or so — an ensemble
-  // of detuned low-passed saws with a breath of vibrato (tape-strings,
-  // deliberately NOT a violin section) swelling a chord on the deal's
-  // scale over ~15 s and sinking back into the reverb
-  const SWELL_CHORDS = [[1, 1.25, 1.5], [1, 1.5, 2], [1, 1.2, 1.5],
-                        [1, 1.333, 2], [1, 1.25, 2]];
-  function stringSwell(){
-    if(ctx.state === 'running' && xtalState.on && Math.random() < 0.75){
-      const t0 = ctx.currentTime + 0.1;
-      const chord = SWELL_CHORDS[Math.random()*SWELL_CHORDS.length|0];
-      const base = singF*(singF > 560 ? 0.5 : 1);   // strings sit low-mid
-      const atk = 3.5 + Math.random()*4;
-      const hold = 2 + Math.random()*4;
-      const rel = 5 + Math.random()*5;
-      const tEnd = t0 + atk + hold + rel + 0.5;
-      const vib = ctx.createOscillator(); vib.frequency.value = 5.1 + Math.random()*0.8;
-      vib.start(t0); vib.stop(tEnd);
-      for(const step of chord){
-        const f = base*step;
-        const lp = ctx.createBiquadFilter();
-        lp.type = 'lowpass'; lp.frequency.value = f*3.2; lp.Q.value = 0.3;
-        const env = ctx.createGain(); env.gain.value = 0;
-        const pan = ctx.createStereoPanner(); pan.pan.value = Math.random()*0.9 - 0.45;
-        lp.connect(env); env.connect(pan); pan.connect(xtal);
-        const peak = 0.014 + Math.random()*0.006;
-        env.gain.setValueAtTime(0, t0);
-        env.gain.linearRampToValueAtTime(peak, t0 + atk);
-        env.gain.linearRampToValueAtTime(peak, t0 + atk + hold);
-        env.gain.linearRampToValueAtTime(0, t0 + atk + hold + rel);
-        for(const det of [0.996, 1.0, 1.0045]){
-          const o = ctx.createOscillator(); o.type = 'sawtooth';
-          o.frequency.value = f*det;
-          const vg = ctx.createGain(); vg.gain.value = f*0.0025;  // vibrato depth
-          vib.connect(vg); vg.connect(o.frequency);
-          const g = ctx.createGain(); g.gain.value = 0.33;
-          o.connect(g); g.connect(lp);
-          o.start(t0); o.stop(tEnd);
-        }
-      }
-    }
-    setTimeout(stringSwell, 45000 + Math.random()*45000);
-  }
-  setTimeout(stringSwell, 15000 + Math.random()*20000);
-
   // SHARD CASCADE: every few minutes, a handful of tiny strikes tumbling
   // down a broken ladder — the memory of breakage, never the crash
   function shardCascade(){
