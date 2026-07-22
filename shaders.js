@@ -539,9 +539,10 @@ uniform vec3  u_ringWV;
 uniform float u_ringArc[3];// emission arc half-width per ring (rad): the
                            // optical softness knob — a wall point sees this
                            // much tube, so small = lace, large = glow
-uniform float u_ringWN;    // the white light is a STRING OF BULBS: count,
+uniform float u_ringWN;    // the bulb light is a STRING OF BULBS: count,
 uniform float u_ringWSpan; // ...the arc they span (rad),
 uniform float u_ringWPh0;  // ...and where along the circle the arc starts
+uniform vec3  u_bulbCol;   // bulb colour (the hoop's curated duo)
 const int GW = 512;
 const int GH = 288;
 const int PER = GW*GH;
@@ -610,7 +611,7 @@ void main(){
     vec3 hitw = P4w + doutw*s4w;
     gl_Position = vec4((hitw.xz - u_caustC)/u_caustS, 0.0, 1.0);
     gl_PointSize = 1.5;
-    v_col = vec3(1.05) * ww * chCol * 0.85;     // white, dispersing at edges
+    v_col = u_bulbCol * ww * chCol * 0.90;      // duo-hued, dispersing at edges
     return;
   }
 
@@ -1017,6 +1018,7 @@ uniform vec3  u_ringWV;
 uniform float u_ringWN;      // bulb count
 uniform float u_ringWSpan;   // arc span (rad)
 uniform float u_ringWPh0;    // arc start phase
+uniform vec3  u_bulbCol;     // bulb colour (the hoop's curated duo)
 in vec2 v_uv;
 out vec4 o;
 
@@ -1392,7 +1394,7 @@ void main(){
         if(tk <= 0.0) continue;
         float d2k = dot(vk - rr*tk, vk - rr*tk);
         float tgw = exp(-d2k/0.00015) + 0.12*exp(-d2k/0.003);
-        colA += vec3(1.25, 1.25, 1.20) * tgw * mirW;
+        colA += u_bulbCol * 1.22 * tgw * mirW;
       }
       // the distant sun's glint: one hard sparkle per facet
       vec3 hs = reflect(u_lightDir[2], N);
@@ -1410,7 +1412,7 @@ void main(){
       if(tk <= 0.0 || (tTable < 1e4 && tk > tTable)) continue;
       float d2k = dot(vk - rd*tk, vk - rd*tk);
       float g = exp(-d2k/0.00015) + 0.10*exp(-d2k/0.003);
-      colA += vec3(1.45, 1.45, 1.38) * g;
+      colA += u_bulbCol * 1.42 * g;
       if(g > 0.5) hitA = min(hitA, tk);           // the bulbs hold focus
     }
     o = vec4(colA, hitA);

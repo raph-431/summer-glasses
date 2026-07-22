@@ -486,9 +486,9 @@ const NEONS = [
   [1.05, 0.45, 0.75],   // pink
 ];
 let ringCol = NEONS[0];
-// curated companion per NEONS entry (by index): when the metal skin is
-// SPOTS, the sequins wear the hoop's duo colour instead of a raw metal —
-// pairings chosen by eye, not derived, so none land on a muddy in-between
+// curated companion per NEONS entry (by index): the LONE BULB wears the
+// hoop's duo colour — pairings chosen by eye, not derived, so none land
+// on a muddy in-between
 const DUOS = [
   [0.15, 0.95, 0.75],   // magenta    → teal
   [1.00, 0.62, 0.10],   // cyan       → amber
@@ -517,6 +517,7 @@ let wTiltA = 0, wTilt = 0.3;  // tilt bearing + angle (rad)
 let wRF = 0.6, wHF = 0.5;     // radius (× maxR) and height fraction
 let wN = 8, wSpan = 3.0, wPh0 = 0;  // it's a STRING OF BULBS along an arc:
                                     // count, span (rad), start phase
+let bulbCol = [1, 1, 0.96];         // the bulb's colour: the hoop's duo
 const BULBS = true;   // back on — but as a single bulb (see the roll)
 const RING_R = [2.1, 2.6, 3.1];      // base radii (× maxR): nested hoops
 // (precession parked: everything holds still while we study the detail —
@@ -641,9 +642,8 @@ function randomize(){
   metalScale = 1.8*Math.exp(r()*1.5);  // log-uniform 1.8–8: islands..speckle
   metalWarp = rng(r, 0.0, 2.2);        // 0 round blobs .. stringy splatter
   metalType = Math.floor(r()*4);       // bands / splashes / spots / filaments
-  // spots swap their metal for the hoop's curated duo colour: the sequins
-  // are tuned to the deal's neon rather than silver/gold/copper
-  if(metalType === 2) metalCol = DUOS[hoopIdx];
+  // the lone bulb wears the hoop's curated duo colour (metals stay metals)
+  bulbCol = DUOS[hoopIdx];
   // the white bulb circle: pushed well off-centre — often halfway out the
   // wall — and slanted anywhere from a polite tip to a hard ~64° keel
   // (pow-biased: usually moderate, sometimes steep)
@@ -1217,6 +1217,7 @@ function frame(){
   gl.uniform1f(uP.u_ringWN, BULBS ? wN : 0);
   gl.uniform1f(uP.u_ringWSpan, wSpan);
   gl.uniform1f(uP.u_ringWPh0, wPh0);
+  gl.uniform3f(uP.u_bulbCol, ...bulbCol);
   gl.uniform1f(uP.u_mode, 0);            // transmitted photons
   gl.drawArrays(gl.POINTS, 0, NPHOT);
   gl.uniform1f(uP.u_mode, 1);            // Fresnel-reflected photons
@@ -1313,6 +1314,7 @@ function frame(){
   gl.uniform1f(uC.u_ringWN, BULBS ? wN : 0);
   gl.uniform1f(uC.u_ringWSpan, wSpan);
   gl.uniform1f(uC.u_ringWPh0, wPh0);
+  gl.uniform3f(uC.u_bulbCol, ...bulbCol);
   // orbit camera from the mouse, with a slow handheld drift on top;
   // target height and orbit radius scale with the glass so every shape frames
   const taY  = 0.33*shape.H + 0.35*shape.y0;   // aim nearer the bowl on stemware
