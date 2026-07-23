@@ -22,8 +22,8 @@ drain (the reason MetaMask/Blockaid flagged v1). `gift(address)` is unchanged.
 **Post-deploy checklist (v2):**
 - [x] deploy both contracts + wire (`setMinter`/`setReceipt`) + upload art
 - [x] `web/config.js` → v2 `contract` + `receipt`
-- [ ] Vercel env `CONTRACT` → `0xb5F7…BD6e`; redeploy; `curl …/api/status`
-- [ ] verify both contracts on Basescan (§2b) if `--verify` didn't run
+- [x] Vercel env `CONTRACT` → `0xb5F7…BD6e`; redeployed; `/api/status` confirms v2
+- [x] both contracts verified on Basescan (deploy-time `--verify`)
 - [ ] live gift→redeem on mainnet; confirm the receipt lands + no MetaMask flag
 - [ ] file the Blockaid false-positive report (§2b) if still flagged
 
