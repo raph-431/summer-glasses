@@ -108,6 +108,9 @@
   <div class="card" id="step-pay" style="display:none">
     <b>1 · prepay the gift</b>
     <p class="muted" id="priceline">…</p>
+    <p class="muted">You'll also receive a small gift receipt — a keepsake token,
+      minted to your wallet, noting the date with a thank-you. It holds no code
+      and can't redeem the drink; it's just yours to keep.</p>
     <button id="pay" class="primary">pay &amp; create gift</button>
     <div id="paymsg" class="warn"></div>
   </div>
@@ -186,7 +189,7 @@ async function readPrice(){
   const stipend = BigInt(await ethCall(CONFIG.rpc, CONFIG.contract, selector('gasStipend()')));
   total = price + stipend;
   $('priceline').textContent =
-    `${fromWei(total)} ETH — the piece (${fromWei(price)}) plus the recipient's gas, prepaid (${fromWei(stipend)}).`;
+    `${fromWei(total)} ETH — the 3D drink (${fromWei(price)}) plus the recipient's gas, prepaid (${fromWei(stipend)}).`;
 }
 
 // The claim address has to exist before gift() can be called, so the code is
