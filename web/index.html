@@ -171,7 +171,7 @@
 <script src="vendor/sha3.js"></script>
 <script type="module">
 import CONFIG from './config.js';
-import { fetchMeta, fetchHTML, seedOf, ownerOf, tokensOf, totalMinted, renderInto,
+import { fetchMeta, htmlForSeed, seedOf, ownerOf, tokensOf, totalMinted, renderInto,
          shortAddr } from './lib/token.js';
 import { thumbnail } from './lib/thumbs.js';
 
@@ -272,7 +272,7 @@ async function fill(el, tokenId){
 
   try {
     const seed = await seedOf(CONFIG, tokenId);
-    const { jpeg, drink, glassware } = await thumbnail(seed, () => fetchHTML(CONFIG, seed));
+    const { jpeg, drink, glassware } = await thumbnail(seed, () => htmlForSeed(CONFIG, seed));
     if(typeof jpeg !== 'string' || !jpeg.startsWith('data:image')) throw new Error('bad thumbnail');
     const name = makeName(tokenId, drink, glassware);
     const thumb = el.querySelector('.g-thumb');

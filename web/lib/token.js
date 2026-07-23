@@ -13,18 +13,52 @@ export async function fetchMeta(cfg, tokenId){
 }
 
 export async function seedOf(cfg, tokenId){
-  return ethCall(cfg.rpc, cfg.contract, selector('seedOf(uint256)') + padId(tokenId));
+  // seeds are fixed forever at redemption, so cache them — a gallery reload
+  // then costs nothing per already-seen glass
+  const key = `seed:${cfg.chainId}:${cfg.contract}:${tokenId}`;
+  try { const c = localStorage.getItem(key); if(c) return c; } catch {}
+  const seed = await ethCall(cfg.rpc, cfg.contract, selector('seedOf(uint256)') + padId(tokenId));
+  if(!/^0x0*$/.test(seed)){ try { localStorage.setItem(key, seed); } catch {} }
+  return seed;
 }
 
 /// The artwork HTML for a token, without the JSON wrapper — cheaper than
 /// tokenURI (no base64 of the whole page) and what the gallery renders.
 export async function fetchHTML(cfg, seed){
-  const hex = await ethCall(cfg.rpc, cfg.contract, selector('tokenHTML(bytes32)') + seed.replace(/^0x/, ''));
+  const hex = await ethCall(cfg.rpc, cfg.contract, selector('tokenHTML(bytes32)') + seed.replace(/^0x/, '').padStart(64, '0'));
   const body = hex.slice(2);
   const len = parseInt(body.slice(64, 128), 16);
   const bytes = new Uint8Array(len);
   for(let i = 0; i < len; i++) bytes[i] = parseInt(body.slice(128 + i*2, 130 + i*2), 16);
   return new TextDecoder().decode(bytes);
+}
+
+// The artwork bytes are IDENTICAL for every glass — only the 32-byte seed
+// differs — yet tokenHTML() re-sends the whole ~60 KB per token. The gallery
+// fetches it ONCE with a sentinel seed, splits out the seed slot, and splices
+// each glass's own seed in locally: N×60 KB of reads collapse to 1×60 KB plus
+// N tiny seed reads. Kept in memory for the page session.
+const SEED_SENTINEL = '0x' + 'deadbeef'.repeat(8);
+let _artTemplate = null;
+
+async function artTemplate(cfg){
+  if(_artTemplate) return _artTemplate;
+  const html = await fetchHTML(cfg, SEED_SENTINEL);
+  const i = html.indexOf(SEED_SENTINEL);
+  if(i < 0 || html.indexOf(SEED_SENTINEL, i + 1) !== -1)
+    throw new Error('seed marker not unique');           // fall back per-token
+  return (_artTemplate = { prefix: html.slice(0, i), suffix: html.slice(i + SEED_SENTINEL.length) });
+}
+
+/// Artwork HTML for a seed, built locally from the once-fetched template.
+/// Falls back to a per-token read if the template can't be established.
+export async function htmlForSeed(cfg, seed){
+  try {
+    const t = await artTemplate(cfg);
+    return t.prefix + '0x' + seed.replace(/^0x/, '').toLowerCase().padStart(64, '0') + t.suffix;
+  } catch {
+    return fetchHTML(cfg, seed);
+  }
 }
 
 export async function ownerOf(cfg, tokenId){
