@@ -333,11 +333,16 @@ async function downloadCard(code, link, note){
     g.fillText('redeem it at', W/2, 788);
     // Phones run OCR over photos (Live Text / Lens) and turn a URL they can
     // read into a tappable link — so this line is an interface, not decoration.
-    // Bigger and near-black to give the recogniser the best possible chance.
+    // Only the bare page address goes here, never the #k=<code> fragment: the
+    // code is already printed in its own box above, and a long code-bearing
+    // URL had to be shrunk to fit, which is exactly what made OCR misread its
+    // small glyphs. Short, large and near-black gives the recogniser its best
+    // chance; the reader types the code into the page.
     g.fillStyle = INK;
     g.font = `26px ${MONO}`;
-    fitText(g, link, W - 140, 26, '', MONO);
-    g.fillText(link, W/2, 828);
+    const pageUrl = link.split('#')[0];
+    fitText(g, pageUrl, W - 140, 26, '', MONO);
+    g.fillText(pageUrl, W/2, 828);
 
     g.fillStyle = INK_SOFT;
     g.font = `21px ${SANS}`;
