@@ -467,7 +467,14 @@ $('connect').addEventListener('click', async () => {
   $('connect').textContent = 'connected';
   $('connect').disabled = true;
   show('step-pay');
-  prepareCode().catch(e => {
+  // hold the pay button until the first claim code is ready — gift() can't be
+  // sent without its claim address
+  $('pay').textContent = 'preparing…';
+  $('pay').disabled = true;
+  prepareCode().then(() => {
+    $('pay').textContent = 'pay & create gift';
+    $('pay').disabled = false;
+  }).catch(e => {
     $('paymsg').textContent = 'could not prepare a gift code: ' + e.message;
     $('pay').disabled = true;
   });
@@ -479,16 +486,23 @@ $('again').addEventListener('click', () => {
   // that was just handed over
   $('step-done').style.display = 'none';
   $('step-code').style.display = 'none';
-  $('pay').textContent = 'pay & create gift';
-  $('pay').disabled = true;
-  $('pay').textContent = 'pay & create gift';
   $('paymsg').textContent = '';
   $('copyLink').textContent = 'copy redeem link';
   $('downloadCard').textContent = 'download gift card';
   $('note').value = '';
   $('noteLeft').textContent = '160';
-  prepareCode().catch(() => {});
-  reveal($('step-code'));
+  // a fresh code has to be ready before the next payment can go out — gift()
+  // needs its claim address — so hold the pay button until it is, then send
+  // them back to the pay step (not the code, which stays hidden until paid).
+  $('pay').textContent = 'preparing…';
+  $('pay').disabled = true;
+  prepareCode().then(() => {
+    $('pay').textContent = 'pay & create gift';
+    $('pay').disabled = false;
+  }).catch(() => {
+    $('paymsg').textContent = 'could not prepare a new gift code — reload and try again';
+  });
+  reveal($('step-pay'));
 });
 
 $('pay').addEventListener('click', async () => {
