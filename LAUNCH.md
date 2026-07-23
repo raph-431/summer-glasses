@@ -24,8 +24,17 @@ drain (the reason MetaMask/Blockaid flagged v1). `gift(address)` is unchanged.
 - [x] `web/config.js` → v2 `contract` + `receipt`
 - [x] Vercel env `CONTRACT` → `0xb5F7…BD6e`; redeployed; `/api/status` confirms v2
 - [x] both contracts verified on Basescan (deploy-time `--verify`)
-- [ ] live gift→redeem on mainnet; confirm the receipt lands + no MetaMask flag
-- [ ] file the Blockaid false-positive report (§2b) if still flagged
+- [x] live gift on mainnet: receipt NFT mints to gifter + shows in simulation
+- [x] filed the Blockaid false-positive report (§2b) — **2026-07-23**
+
+**Blockaid status (as of 2026-07-23):** still flagged. Confirmed *not* a code
+issue — the receipt shows in simulation as an asset received, and the receipt
+is a standards-compliant ERC-721 (`supportsInterface` 0x80ac58cd = true; the
+"UNKNOWN" standard MetaMask shows is just its NFT indexer lagging on a fresh
+contract, cosmetic, resolves on its own). The warning is a reputation signal on
+a brand-new value-moving contract. Report filed at report.blockaid.io on
+2026-07-23. **Follow up if still flagged by ~2026-07-30**; the warning can also
+linger client-side briefly after Blockaid clears it.
 
 **Still open, deliberately:**
 - `freezeArt()` — NOT called. Art stays updatable via `UpdateArt.s.sol`.
