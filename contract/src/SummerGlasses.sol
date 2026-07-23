@@ -9,6 +9,10 @@ import {Base64} from "openzeppelin-contracts/utils/Base64.sol";
 import {Strings} from "openzeppelin-contracts/utils/Strings.sol";
 import {SSTORE2} from "./SSTORE2.sol";
 
+interface IGiftReceipt {
+    function mint(address to) external returns (uint256);
+}
+
 /// @title Summer Glasses — an on-chain generative series, minted by gift.
 ///
 /// One glass of something cold on a sunlit table, dealt from a hash. The
@@ -49,6 +53,10 @@ contract SummerGlasses is ERC721, ERC2981, Ownable {
     uint96 public gasStipend;
     uint256 public maxSupply;
     bool public supplyLocked;
+
+    /// optional keepsake token minted to the gifter on gift() (see GiftReceipt).
+    /// Set once, then immutable. When unset, gifting works exactly as before.
+    IGiftReceipt public receipt;
 
     uint256 public constant RECLAIM_AFTER = 365 days;
 
@@ -120,6 +128,11 @@ contract SummerGlasses is ERC721, ERC2981, Ownable {
         });
         outstandingGifts += 1;
         emit Gifted(claimAddr, msg.sender, msg.value);
+
+        // Hand the gifter an on-chain keepsake. This also makes wallet
+        // simulators show an asset received, so gift() no longer reads like a
+        // one-way drain. Guarded so gifting still works if no receipt is bound.
+        if (address(receipt) != address(0)) receipt.mint(msg.sender);
     }
 
     /// What the claim key must sign (raw digest, no EIP-191 prefix): chain
@@ -190,6 +203,14 @@ contract SummerGlasses is ERC721, ERC2981, Ownable {
 
     function setImageBase(string calldata base) external onlyOwner {
         imageBase = base;
+    }
+
+    /// Bind the gift-receipt token, once. After this it can never be changed,
+    /// so the gifter's keepsake can't be swapped for something malicious.
+    function setReceipt(address receipt_) external onlyOwner {
+        require(address(receipt) == address(0), "receipt set");
+        require(receipt_ != address(0), "zero receipt");
+        receipt = IGiftReceipt(receipt_);
     }
 
     function artChunkCount() external view returns (uint256) {

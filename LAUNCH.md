@@ -16,6 +16,14 @@
 Verified: art payload on mainnet is byte-identical to the rehearsed build;
 the relayer is net-positive per redeem (earns the stipend, spends less on gas).
 
+**Pending change (branch `receipt`):** the live mainnet contract above predates
+the `GiftReceipt` keepsake, so its bare `gift()` is flagged "suspicious" by
+MetaMask/Blockaid (moves ETH out, returns no asset). The fix — mint the gifter a
+receipt token inside `gift()` — can't be applied to a non-upgradeable deployed
+contract, so it needs a **fresh deploy** of both contracts (only #1 is minted;
+art isn't frozen, supply isn't locked, so this is cheap). After redeploy, update
+`config.js` + Vercel `CONTRACT` to the new address.
+
 **Still open, deliberately:**
 - `freezeArt()` — NOT called. Art stays updatable via `UpdateArt.s.sol`.
 - `lockSupply()` — NOT called. maxSupply 1000 remains adjustable.
@@ -64,6 +72,15 @@ forge script script/Deploy.s.sol --rpc-url https://sepolia.base.org \
 # optional source verification (needs BASESCAN_API_KEY):
 #   add  --verify --etherscan-api-key $BASESCAN_API_KEY  to the command
 ```
+
+`Deploy.s.sol` now deploys **two** contracts and wires them in one broadcast:
+`GiftReceipt` (the gifter's on-chain keepsake) then `SummerGlasses`, followed by
+the one-time `receipt.setMinter(glasses)` + `glasses.setReceipt(receipt)` bindings.
+The script logs both addresses — record the `GiftReceipt` address too (verify it on
+Basescan separately). This receipt is what makes the wallet simulator show the
+gifter an asset received, so `gift()` no longer trips MetaMask's "suspicious"
+drainer heuristic. Nothing else in the flow changes; `gift(address)` is called
+exactly as before.
 
 Then wire the pieces:
 
