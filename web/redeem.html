@@ -159,7 +159,7 @@
 <script src="vendor/sha3.js"></script>
 <script type="module">
 import CONFIG from './config.js';
-import { keyFromCode, badWords, addressOf, signDigest, newClaimKey, bytesToHex } from './lib/claim.js';
+import { keyFromCode, badWords, readCode, addressOf, signDigest, newClaimKey, bytesToHex } from './lib/claim.js';
 import { ethCall, selector, padAddress } from './lib/rpc.js';
 import { fetchMeta, renderInto } from './lib/token.js';
 
@@ -190,7 +190,10 @@ async function checkCode(){
       $('codeMsg').className = 'err'; return;
     }
     priv = key; claimAddr = addr;
-    $('codeMsg').textContent = '✓ a glass is waiting for this code';
+    const rc = readCode(raw);
+    $('codeMsg').textContent = rc && rc.corrected
+      ? `✓ a glass is waiting — reading your code as “${rc.display}”`
+      : '✓ a glass is waiting for this code';
     $('codeMsg').className = 'ok';
     $('step-to').style.display = 'block';
     $('step-go').style.display = 'block';
