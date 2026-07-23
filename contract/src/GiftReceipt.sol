@@ -91,16 +91,37 @@ contract GiftReceipt is ERC721, Ownable {
         );
         bytes memory body = abi.encodePacked(
             "<text x='300' y='114' text-anchor='middle' font-family='Helvetica,Arial,sans-serif' font-size='13' letter-spacing='4' fill='#7a4a1e' fill-opacity='0.7'>GIFT RECEIPT &#183; No. ", num, "</text>",
-            "<line x1='210' y1='142' x2='390' y2='142' stroke='#8a5a2b' stroke-opacity='0.4' stroke-width='1'/>",
+            _motif(),
             "<text x='300' y='210' text-anchor='middle' font-family='Georgia,serif' font-style='italic' font-size='27' fill='#6b4423'>", NOTE_1, "</text>",
             "<text x='300' y='246' text-anchor='middle' font-family='Georgia,serif' font-style='italic' font-size='27' fill='#6b4423'>", NOTE_2, "</text>"
         );
-        bytes memory foot = abi.encodePacked(
+        return abi.encodePacked(head, body, _foot(when));
+    }
+
+    /// A small faceted tumbler with an amber pour, flanked by two hairlines —
+    /// the divider, but as a glass. All static; kept in its own function so
+    /// the encodePacked stacks stay shallow.
+    function _motif() internal pure returns (string memory) {
+        return string(abi.encodePacked(
+            "<line x1='178' y1='144' x2='277' y2='144' stroke='#8a5a2b' stroke-opacity='0.4' stroke-width='1'/>",
+            "<line x1='323' y1='144' x2='422' y2='144' stroke='#8a5a2b' stroke-opacity='0.4' stroke-width='1'/>",
+            "<g fill='none' stroke='#8a5a2b' stroke-opacity='0.6' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'>",
+            "<path d='M293 139 L307 139 L305.5 156.5 Q300 158.5 294.5 156.5 Z' fill='#eaa24e' fill-opacity='0.5' stroke='none'/>",
+            "<path d='M289 128 L292 157 Q300 160 308 157 L311 128'/>",
+            "<ellipse cx='300' cy='128' rx='11' ry='2.6'/>",
+            "<path d='M293 139 Q300 141.4 307 139'/>",
+            "<line x1='296.6' y1='131' x2='297.2' y2='156'/>",
+            "<line x1='303.4' y1='131' x2='302.8' y2='156'/>",
+            "</g>"
+        ));
+    }
+
+    function _foot(string memory when) internal pure returns (bytes memory) {
+        return abi.encodePacked(
             "<text x='300' y='312' text-anchor='middle' font-family='Helvetica,Arial,sans-serif' font-size='15' letter-spacing='1' fill='#7a4a1e'>Gifted ", when, "</text>",
             "<text x='300' y='340' text-anchor='middle' font-family='Georgia,serif' font-style='italic' font-size='14' fill='#7a4a1e' fill-opacity='0.75'>with thanks</text>",
             "</svg>"
         );
-        return abi.encodePacked(head, body, foot);
     }
 
     // ---- date -------------------------------------------------------------
