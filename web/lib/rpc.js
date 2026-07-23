@@ -1,15 +1,61 @@
 // Minimal JSON-RPC + ABI helpers — just enough for the two pages, no library.
 import { keccak, bytesToHex } from './claim.js';
 
-export async function rpc(url, method, params){
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+// Public RPCs (Base's mainnet endpoint especially) rate-limit aggressively,
+// and the gallery fans out many reads at once — owner + seed + the ~60 KB
+// on-chain artwork per glass, several rows lighting up together. Funnel every
+// request through a small concurrency gate, and retry the ones that come back
+// "over rate limit" with exponential backoff, so a busy page degrades to
+// slower rather than failing. One shared queue across the whole page.
+const MAX_INFLIGHT = 3;
+const MAX_RETRIES = 6;
+let inflight = 0;
+const queue = [];
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const isRateLimit = (e) =>
+  /rate limit|too many|429|-32005|capacity|throttl/i.test(String((e && (e.message || e)) || ''));
+// exponential backoff with jitter: ~0.4s, 0.8s, 1.6s, … capped at 6s
+const backoff = (attempt) => Math.min(6000, 400 * 2 ** attempt) + Math.random() * 250;
+
+function pump(){
+  while(inflight < MAX_INFLIGHT && queue.length){
+    const job = queue.shift();
+    inflight++;
+    job().finally(() => { inflight--; pump(); });
+  }
+}
+
+export function rpc(url, method, params){
+  return new Promise((resolve, reject) => {
+    queue.push(async () => {
+      for(let attempt = 0; ; attempt++){
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+          });
+          if(res.status === 429){
+            if(attempt >= MAX_RETRIES){ reject(new Error('over rate limit')); return; }
+            await sleep(backoff(attempt)); continue;
+          }
+          const body = await res.json();
+          if(body.error){
+            const err = new Error(body.error.message || 'rpc error');
+            if(isRateLimit(err) && attempt < MAX_RETRIES){ await sleep(backoff(attempt)); continue; }
+            reject(err); return;
+          }
+          resolve(body.result); return;
+        } catch(e){
+          // network blips and rate-limit bodies both retry; everything else fails fast
+          if(isRateLimit(e) && attempt < MAX_RETRIES){ await sleep(backoff(attempt)); continue; }
+          reject(e); return;
+        }
+      }
+    });
+    pump();
   });
-  const body = await res.json();
-  if(body.error) throw new Error(body.error.message || 'rpc error');
-  return body.result;
 }
 
 export const selector = (sig) => bytesToHex(keccak(sig)).slice(0, 10);
