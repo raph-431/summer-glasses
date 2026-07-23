@@ -1,28 +1,31 @@
 # Launch runbook — Summer Glasses
 
-## STATUS as of 2026-07-21 — LIVE ON BASE MAINNET
+## STATUS as of 2026-07-23 — LIVE ON BASE MAINNET (v2, with gift receipt)
 
 | | |
 |---|---|
-| contract | `0x87e957299624dE48285ff420989749760b58a4A8` (Base, chainId 8453) |
+| contract (v2) | `0xb5F7C80B98aCFb553b3e01E9fEe0FCa4950CBD6e` (Base, chainId 8453) |
+| gift receipt | `0xf3D49De68fCb26be78eFd36DD828cd0206F0400f` (keepsake minted to gifter) |
 | owner / deployer | `0xa4Cf6e6bc4264711f107d6fEb60f256Ae0a7055C` (keystore `deployer-base`) |
 | relayer | `0xdA5BDb3Cfd7406dFd873D2E983901C0ADDCe9222` (keystore `relayer-base`) |
 | site | https://summerdrinks.fun (`/api/status` = health check) |
-| source | verified on Basescan, **exact match** |
 | params | price 0.002 ETH · stipend 0.00005 ETH · maxSupply 1000 |
-| minted | #1 (real gift→redeem, seed verified against tokenURI) |
-| Sepolia rehearsal | `0x179a7697554a759acbe5d1913346b6687eC7e504` (same art, byte-identical) |
+| minted | none yet on v2 (`nextId` = 1) |
+| wiring | `receipt()`↔`minter()` confirmed on-chain; both owned by deployer |
+| v1 (abandoned) | `0x87e957299624dE48285ff420989749760b58a4A8` — 0 outstanding gifts, only test token #1; 0.002 ETH proceeds still withdrawable there |
+| Sepolia rehearsal | `0x179a7697554a759acbe5d1913346b6687eC7e504` (v1 art, byte-identical) |
 
-Verified: art payload on mainnet is byte-identical to the rehearsed build;
-the relayer is net-positive per redeem (earns the stipend, spends less on gas).
+v2 mints the gifter a `GiftReceipt` keepsake inside `gift()`, so wallet
+simulators show an asset received and `gift()` no longer reads as a one-way
+drain (the reason MetaMask/Blockaid flagged v1). `gift(address)` is unchanged.
 
-**Pending change (branch `receipt`):** the live mainnet contract above predates
-the `GiftReceipt` keepsake, so its bare `gift()` is flagged "suspicious" by
-MetaMask/Blockaid (moves ETH out, returns no asset). The fix — mint the gifter a
-receipt token inside `gift()` — can't be applied to a non-upgradeable deployed
-contract, so it needs a **fresh deploy** of both contracts (only #1 is minted;
-art isn't frozen, supply isn't locked, so this is cheap). After redeploy, update
-`config.js` + Vercel `CONTRACT` to the new address.
+**Post-deploy checklist (v2):**
+- [x] deploy both contracts + wire (`setMinter`/`setReceipt`) + upload art
+- [x] `web/config.js` → v2 `contract` + `receipt`
+- [ ] Vercel env `CONTRACT` → `0xb5F7…BD6e`; redeploy; `curl …/api/status`
+- [ ] verify both contracts on Basescan (§2b) if `--verify` didn't run
+- [ ] live gift→redeem on mainnet; confirm the receipt lands + no MetaMask flag
+- [ ] file the Blockaid false-positive report (§2b) if still flagged
 
 **Still open, deliberately:**
 - `freezeArt()` — NOT called. Art stays updatable via `UpdateArt.s.sol`.
