@@ -43,16 +43,22 @@ const revert = () => ({ status: 200, json: async () => ({ error: { message: 'exe
   check('does not retry a real revert', threw === 'execution reverted' && n === 1);
 }
 
-// 4) concurrency is capped at 3 even when 8 calls are fired together
+// 4) concurrency is capped AND requests are spaced out (rate-limited), even
+//    when 8 calls are fired together
 {
   let cur = 0, peak = 0;
+  const starts = [];
   globalThis.fetch = async () => {
+    starts.push(Date.now());
     cur++; peak = Math.max(peak, cur);
-    await new Promise(r => setTimeout(r, 40));
+    await new Promise(r => setTimeout(r, 30));
     cur--; return ok('0x1');
   };
   await Promise.all(Array.from({ length: 8 }, () => rpc('u', 'eth_call', [])));
-  check('never more than 3 requests in flight at once', peak <= 3 && peak > 0);
+  check('never more than 2 requests in flight at once', peak <= 2 && peak > 0);
+  // consecutive dispatches are spaced by roughly the min gap (allow slack)
+  const gaps = starts.slice(1).map((t, i) => t - starts[i]);
+  check('requests are spaced out, not bursted', gaps.filter(g => g >= 90).length >= 5);
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');

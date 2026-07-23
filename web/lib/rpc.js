@@ -7,9 +7,16 @@ import { keccak, bytesToHex } from './claim.js';
 // request through a small concurrency gate, and retry the ones that come back
 // "over rate limit" with exponential backoff, so a busy page degrades to
 // slower rather than failing. One shared queue across the whole page.
-const MAX_INFLIGHT = 3;
+// Cap both how many requests run at once AND how fast they go out: Base's
+// public endpoint limits by rate, not just concurrency, so bursting three
+// quick reads still trips a 429. Two in flight, spaced ≥ MIN_GAP_MS apart,
+// keeps us under the limit; the retry below mops up the occasional overflow.
+const MAX_INFLIGHT = 2;
+const MIN_GAP_MS = 120;
 const MAX_RETRIES = 6;
 let inflight = 0;
+let lastDispatch = 0;
+let pumpTimer = null;
 const queue = [];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -19,7 +26,14 @@ const isRateLimit = (e) =>
 const backoff = (attempt) => Math.min(6000, 400 * 2 ** attempt) + Math.random() * 250;
 
 function pump(){
+  if(pumpTimer) return;                       // a spaced dispatch is already pending
   while(inflight < MAX_INFLIGHT && queue.length){
+    const wait = lastDispatch + MIN_GAP_MS - Date.now();
+    if(wait > 0){                             // too soon — space the next one out
+      pumpTimer = setTimeout(() => { pumpTimer = null; pump(); }, wait);
+      return;
+    }
+    lastDispatch = Date.now();
     const job = queue.shift();
     inflight++;
     job().finally(() => { inflight--; pump(); });
