@@ -16,6 +16,14 @@
 Verified: art payload on mainnet is byte-identical to the rehearsed build;
 the relayer is net-positive per redeem (earns the stipend, spends less on gas).
 
+**Pending change (branch `receipt`):** the live mainnet contract above predates
+the `GiftReceipt` keepsake, so its bare `gift()` is flagged "suspicious" by
+MetaMask/Blockaid (moves ETH out, returns no asset). The fix — mint the gifter a
+receipt token inside `gift()` — can't be applied to a non-upgradeable deployed
+contract, so it needs a **fresh deploy** of both contracts (only #1 is minted;
+art isn't frozen, supply isn't locked, so this is cheap). After redeploy, update
+`config.js` + Vercel `CONTRACT` to the new address.
+
 **Still open, deliberately:**
 - `freezeArt()` — NOT called. Art stays updatable via `UpdateArt.s.sol`.
 - `lockSupply()` — NOT called. maxSupply 1000 remains adjustable.
@@ -64,6 +72,15 @@ forge script script/Deploy.s.sol --rpc-url https://sepolia.base.org \
 # optional source verification (needs BASESCAN_API_KEY):
 #   add  --verify --etherscan-api-key $BASESCAN_API_KEY  to the command
 ```
+
+`Deploy.s.sol` now deploys **two** contracts and wires them in one broadcast:
+`GiftReceipt` (the gifter's on-chain keepsake) then `SummerGlasses`, followed by
+the one-time `receipt.setMinter(glasses)` + `glasses.setReceipt(receipt)` bindings.
+The script logs both addresses — record the `GiftReceipt` address too (verify it on
+Basescan separately). This receipt is what makes the wallet simulator show the
+gifter an asset received, so `gift()` no longer trips MetaMask's "suspicious"
+drainer heuristic. Nothing else in the flow changes; `gift(address)` is called
+exactly as before.
 
 Then wire the pieces:
 
@@ -121,6 +138,58 @@ cast send $CONTRACT "freezeArt()" …                                # art is no
   periodically. Compromise = lost float, never user funds.
 - `withdraw()` pays out proceeds of redeemed gifts only; escrowed
   (unredeemed) gifts can never be withdrawn — no rug surface.
+
+## 2b · Verify source, then clear the MetaMask flag
+
+Two separate things: **verifying** the source on Basescan (public, mechanical)
+and **reporting** the false positive to Blockaid (what actually removes the
+warning). Do both, verify first.
+
+### Verify both contracts on Basescan
+
+The deploy can self-verify: add `--verify --etherscan-api-key $BASESCAN_API_KEY`
+to the `forge script` command and it verifies every contract it created,
+constructor args and all. If that step is skipped or fails, verify each by hand
+(`--chain base`, or `baseSepolia` for the rehearsal):
+
+```sh
+cd contract
+# GiftReceipt — no constructor args
+forge verify-contract $RECEIPT src/GiftReceipt.sol:GiftReceipt \
+  --chain base --etherscan-api-key $BASESCAN_API_KEY --watch
+
+# SummerGlasses — constructor(price, stipend, maxSupply); args must match deploy
+forge verify-contract $CONTRACT src/SummerGlasses.sol:SummerGlasses \
+  --chain base --etherscan-api-key $BASESCAN_API_KEY --watch \
+  --constructor-args $(cast abi-encode \
+    "constructor(uint256,uint96,uint256)" 2000000000000000 50000000000000 1000)
+# if --chain base isn't recognised, add:
+#   --verifier etherscan --verifier-url https://api.basescan.org/api
+```
+
+Confirm both read "Contract Source Code Verified" on basescan.org. Verified
+source is a prerequisite for the Blockaid review below and a standing reputation
+signal.
+
+### Report the false positive to Blockaid
+
+Minting the receipt makes the simulation honest (an asset comes back), but a
+brand-new contract can still be flagged until Blockaid's reputation catches up.
+Two routes, use both:
+
+1. **Blockaid report portal — https://report.blockaid.io/** — submit the
+   contract address + chain (Base, 8453) and explain it's a legitimate gift
+   contract: `gift()` escrows a prepaid NFT gift and mints the payer an on-chain
+   receipt token (so the simulation shows an asset received), source verified on
+   Basescan. This is the channel that gets a wrongly-flagged contract cleared.
+2. **In-wallet report** — when MetaMask shows the warning on a real `gift()`,
+   expand it with **See details → Report an issue**; that submits the exact
+   transaction to MetaMask/Blockaid as a disputed detection.
+
+The warning can persist briefly after Blockaid clears it on their side (client
+caches), and reputation also builds on its own with clean usage over time. Keep
+`gift.html`'s receipt note (it sets the gifter's expectation that a second token
+lands in their wallet).
 
 ## 3 · After launch
 

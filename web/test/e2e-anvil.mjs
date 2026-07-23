@@ -50,7 +50,10 @@ await waitFor(() => rpc(RPC, 'eth_chainId', []), 'anvil');
 execFileSync('forge', ['script', 'script/Deploy.s.sol', '--rpc-url', RPC,
   '--private-key', PK0, '--broadcast'], { cwd: path.join(root, 'contract'), stdio: 'pipe' });
 const run = JSON.parse(fs.readFileSync(path.join(root, 'contract/broadcast/Deploy.s.sol/31337/run-latest.json')));
-const CONTRACT = run.transactions.find(t => t.transactionType === 'CREATE').contractAddress;
+// the deploy now creates two contracts (SummerGlasses + GiftReceipt) — pick
+// the glasses one by name rather than "first CREATE"
+const CONTRACT = run.transactions.find(t => t.transactionType === 'CREATE' && t.contractName === 'SummerGlasses').contractAddress;
+const RECEIPT = run.transactions.find(t => t.transactionType === 'CREATE' && t.contractName === 'GiftReceipt').contractAddress;
 
 // compare against the anvil block specifically — the default export tracks
 // whichever network is currently being worked on
@@ -75,6 +78,12 @@ cast('send', CONTRACT, 'gift(address)', claimAddr, '--value', (PRICE + STIPEND).
      '--private-key', PK0, '--rpc-url', RPC);
 const slot = await ethCall(RPC, CONTRACT, selector('gifts(address)') + padAddress(claimAddr));
 check('gift escrowed', !/^0+$/.test(slot.slice(2 + 24, 2 + 64)));
+
+// the gifter should have received a keepsake receipt (this is what stops the
+// wallet simulator flagging gift() as a one-way drain)
+const gifterAddr = cast('wallet', 'address', '--private-key', PK0);
+const rbal = await ethCall(RPC, RECEIPT, selector('balanceOf(address)') + padAddress(gifterAddr));
+check('gifter received a receipt token', BigInt(rbal) === 1n);
 
 // redeem page: fresh recipient wallet, sign, relayer
 const recipientKey = newClaimKey();

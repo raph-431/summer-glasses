@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {SummerGlasses} from "../src/SummerGlasses.sol";
+import {GiftReceipt} from "../src/GiftReceipt.sol";
 
 /// Deploys the contract and uploads the artwork from ../dist (run
 /// `node build.js` first). Art is NOT frozen here — freeze at launch, after
@@ -22,7 +23,14 @@ contract Deploy is Script {
         bytes memory payload = bytes(vm.readFile("../dist/payload.b64"));
 
         vm.startBroadcast();
+        // SummerGlasses first so it keeps anvil's well-known first-deploy
+        // address (see web/config.js), then the receipt, then wire the two.
         SummerGlasses glasses = new SummerGlasses(price, stipend, supply);
+        GiftReceipt receipt = new GiftReceipt();
+        // one-time bindings: only the glasses contract can mint receipts, and
+        // the glasses contract mints one keepsake per gift()
+        receipt.setMinter(address(glasses));
+        glasses.setReceipt(address(receipt));
         glasses.setArtWrapper(
             bytes(vm.readFile("../dist/art-prefix1.txt")),
             bytes(vm.readFile("../dist/art-prefix2.txt")),
@@ -37,6 +45,7 @@ contract Deploy is Script {
         vm.stopBroadcast();
 
         console.log("SummerGlasses deployed:", address(glasses));
+        console.log("GiftReceipt deployed:", address(receipt));
         console.log("art chunks:", glasses.artChunkCount());
         console.log("price (wei):", price);
         console.log("stipend (wei):", stipend);
