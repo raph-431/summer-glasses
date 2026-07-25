@@ -34,6 +34,7 @@ export const base = {
   // is abandoned — 0 outstanding gifts, only a test token #1 minted there.
   contract: '0xb5F7C80B98aCFb553b3e01E9fEe0FCa4950CBD6e',
   receipt: '0xf3D49De68fCb26be78eFd36DD828cd0206F0400f',
+  deployBlock: 49014755,   // where checkgifts.html starts its event scan
   relayer: '/api',   // Vercel serverless function on the same domain
   explorerTx: 'https://basescan.org/tx/',
 };

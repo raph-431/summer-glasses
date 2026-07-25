@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Summer in a Glass — your gifts</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  html{ margin:0; min-height:100%;
+    background:radial-gradient(130% 340px at 50% -80px, rgba(240,162,59,.28), transparent 62%), var(--paper); }
+  body{ margin:0; min-height:100vh; box-sizing:border-box;
+    display:grid; place-items:start center; padding:52px 16px; }
+  main{ max-width:600px; width:100%; }
+  h1{ font-family:var(--serif); font-style:italic; font-weight:400;
+    font-size:clamp(28px,5.5vw,40px); line-height:1.02; margin:0 0 6px; }
+  .sub{ margin-bottom:24px; font-size:15px; color:var(--ink-soft); }
+  .card{ margin-bottom:18px; }
+  .card > b{ font:600 11px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--bitter); }
+  input[type=text]{ width:100%; box-sizing:border-box; font:14px var(--mono); color:var(--ink);
+    padding:11px 13px; border-radius:3px; border:1px solid var(--line); background:var(--paper); }
+  input[type=text]:focus{ outline:none; border-color:var(--oxblood); }
+  .row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  button{ font:600 14px var(--sans); padding:11px 18px; cursor:pointer; border-radius:2px;
+    border:1px solid var(--ink); background:transparent; color:var(--ink); transition:transform .14s, box-shadow .14s; }
+  button:hover:not(:disabled){ transform:translateY(-1px); }
+  button:disabled{ opacity:.4; cursor:default; }
+  button.primary{ background:var(--ink); color:var(--paper); }
+  button.primary:hover:not(:disabled){ box-shadow:0 8px 18px rgba(42,32,26,.26); }
+  .muted{ color:var(--ink-soft); font-size:13px; }
+  .err{ color:var(--err); }
+  #browse{ position:fixed; right:18px; top:16px; z-index:5; }
+  #browse a{ display:inline-block; font:600 12px var(--mono); letter-spacing:.06em;
+    text-transform:uppercase; color:var(--ink); text-decoration:none;
+    padding:8px 13px; border-radius:2px; border:1px solid var(--line); background:var(--paper); }
+  #browse a:hover{ background:var(--paper-2); }
+  @media (max-width:760px){ #browse{ position:static; margin:0 0 18px; text-align:center; } body{ padding-top:30px; } }
+
+  #summary{ display:none; gap:18px; flex-wrap:wrap; margin:6px 0 14px; }
+  #summary .stat{ font:13px var(--sans); color:var(--ink-soft); }
+  #summary .stat b{ font:600 20px var(--serif); font-style:normal; color:var(--ink); display:block; }
+  #list{ list-style:none; margin:0; padding:0; }
+  #list li{ display:flex; align-items:center; gap:14px; padding:13px 2px;
+    border-top:1px solid var(--line); font-size:14px; }
+  #list li:last-child{ border-bottom:1px solid var(--line); }
+  .pill{ flex:0 0 auto; font:600 11px var(--mono); letter-spacing:.05em; text-transform:uppercase;
+    padding:4px 9px; border-radius:100px; white-space:nowrap; }
+  .pill.waiting{ color:#8a5a12; background:rgba(240,162,59,.20); }
+  .pill.redeemed{ color:#1f6b3a; background:rgba(46,139,58,.16); }
+  .pill.reclaimed{ color:var(--ink-soft); background:var(--paper-2); }
+  .g-when{ flex:1 1 auto; color:var(--ink); }
+  .g-when small{ display:block; color:var(--ink-soft); font-size:12px; margin-top:1px; }
+  .g-link{ flex:0 0 auto; }
+  .g-link a{ font:600 13px var(--sans); color:var(--oxblood); text-decoration:none; }
+  .g-link a:hover{ text-decoration:underline; }
+  #note{ margin-top:20px; font-size:12.5px; color:var(--ink-soft); line-height:1.6; }
+</style>
+</head>
+<body>
+<div id="browse"><a href="index.html">view all glasses →</a></div>
+
+<main>
+  <h1>your gifts</h1>
+  <div class="sub">See which of the gifts you've paid for have been poured, and which are still waiting. This reads the chain only — it never spends, signs, or reveals a code.</div>
+
+  <div class="card">
+    <b>your gifting wallet</b>
+    <p class="muted">The address you paid from. Paste it, or use your wallet.</p>
+    <input type="text" id="addr" placeholder="0x…" autocomplete="off" spellcheck="false">
+    <div class="row">
+      <button id="check" class="primary">check my gifts</button>
+      <button id="useWallet">use my wallet</button>
+      <button id="refresh" style="display:none">rescan from scratch</button>
+    </div>
+    <div id="msg" class="muted" style="margin-top:10px"></div>
+  </div>
+
+  <div id="summary">
+    <div class="stat"><b id="cWaiting">0</b> waiting</div>
+    <div class="stat"><b id="cRedeemed">0</b> poured</div>
+    <div class="stat"><b id="cReclaimed">0</b> reclaimed</div>
+  </div>
+
+  <ul id="list"></ul>
+
+  <div id="note"></div>
+</main>
+
+<script src="vendor/sha3.js"></script>
+<script type="module">
+import CONFIG from './config.js';
+import { scanGifts, clearGiftCache } from './lib/gifts.js';
+
+const $ = id => document.getElementById(id);
+const setMsg = (t, cls = 'muted') => { $('msg').textContent = t; $('msg').className = cls; };
+
+const isAddr = (a) => /^0x[0-9a-fA-F]{40}$/.test(a);
+const shortAddr = (a) => a.slice(0, 6) + '…' + a.slice(-4);
+const fmtDate = (ts) => ts
+  ? new Date(ts * 1000).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+  : 'date unknown';
+
+function render(gifts){
+  const counts = { waiting: 0, redeemed: 0, reclaimed: 0 };
+  gifts.forEach(g => { counts[g.status] = (counts[g.status] || 0) + 1; });
+  $('cWaiting').textContent = counts.waiting;
+  $('cRedeemed').textContent = counts.redeemed;
+  $('cReclaimed').textContent = counts.reclaimed;
+  $('summary').style.display = 'flex';
+
+  const list = $('list');
+  list.innerHTML = '';
+  for(const g of gifts){
+    const li = document.createElement('li');
+    const label = g.status === 'redeemed' ? 'poured' : g.status;
+    const detail = g.status === 'redeemed' && g.to ? `poured to ${shortAddr(g.to)}`
+      : g.status === 'reclaimed' ? 'refunded to you'
+      : 'not yet redeemed';
+    const link = g.status === 'redeemed' && g.tokenId
+      ? `<span class="g-link"><a href="index.html#${g.tokenId}">Glass #${g.tokenId} →</a></span>` : '';
+    li.innerHTML = `
+      <span class="pill ${g.status}">${label}</span>
+      <span class="g-when">${fmtDate(g.timestamp)}<small>${detail}</small></span>
+      ${link}`;
+    list.appendChild(li);
+  }
+  $('note').textContent = gifts.length
+    ? 'Waiting gifts are still claimable by whoever holds the code; if one is never redeemed, you can reclaim its funds after a year. This page can’t show or recover a code — keep the cards you sent.'
+    : '';
+}
+
+let running = false;
+async function run(fresh = false){
+  const addr = $('addr').value.trim();
+  if(!isAddr(addr)){ setMsg('enter a valid 0x… address', 'err'); return; }
+  if(running) return;
+  running = true;
+  $('check').disabled = true; $('refresh').disabled = true;
+  $('list').innerHTML = ''; $('summary').style.display = 'none'; $('note').textContent = '';
+  if(fresh) clearGiftCache(CONFIG, addr);
+  setMsg('scanning the chain… this can take a few seconds');
+  try {
+    const gifts = await scanGifts(CONFIG, addr, {
+      fresh,
+      onProgress: (done, total) => setMsg(`scanning the chain… ${Math.min(99, Math.floor(done / total * 100))}%`),
+    });
+    if(!gifts.length){ setMsg('no gifts found for that address on ' + CONFIG.chainName + '.', 'muted'); }
+    else { setMsg(`${gifts.length} gift${gifts.length === 1 ? '' : 's'} found.`, 'muted'); render(gifts); }
+    $('refresh').style.display = 'inline-block';
+    history.replaceState(null, '', '#' + addr);
+  } catch(e){
+    setMsg('could not finish the scan: ' + (e.message || e) + ' — try again.', 'err');
+  } finally {
+    running = false; $('check').disabled = false; $('refresh').disabled = false;
+  }
+}
+
+$('check').addEventListener('click', () => run(false));
+$('refresh').addEventListener('click', () => run(true));
+
+$('useWallet').addEventListener('click', async () => {
+  if(!window.ethereum){ setMsg('no wallet found in this browser — paste your address instead', 'err'); return; }
+  try {
+    const [acct] = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    $('addr').value = acct;
+    run(false);
+  } catch(e){
+    setMsg(e.code === 4001 ? 'wallet connection cancelled' : 'could not read your wallet: ' + (e.message || e), 'err');
+  }
+});
+
+$('addr').addEventListener('keydown', e => { if(e.key === 'Enter') run(false); });
+
+// deep link: #0x… pre-fills and runs
+const h = decodeURIComponent(location.hash.slice(1));
+if(isAddr(h)){ $('addr').value = h; run(false); }
+</script>
+</body>
+</html>
