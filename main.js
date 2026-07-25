@@ -821,6 +821,16 @@ let wN = 8, wSpan = 3.0, wPh0 = 0;  // it's a STRING OF BULBS along an arc:
                                     // count, span (rad), start phase
 let bulbCol = [1, 1, 0.96];         // the bulb's colour: the hoop's duo
 const BULBS = true;   // back on — but as a single bulb (see the roll)
+// LASER FAN: an occasional visitor — 1–5 pencil beams from one off-scene
+// pivot, sweeping the vessel slowly and painting refracted trails into the
+// long exposure. Presence rolled per deal; episodes come and go on the
+// piece's own noise (like the rims' singing). #beams in the URL hash holds
+// an episode open for auditioning.
+let beamOn = false, beamN = 1, beamCol = [1, 0.2, 0.5], beamColName = '';
+let beamAz0 = 0, beamEl0 = 0.6, beamFan = 0.1, beamW = 0.02;
+let beamSpd = 1, beamGate = 0, beamPh1 = 0, beamPh2 = 0, beamPh3 = 0;
+let beamEnv = 0, beamPivot = [0, 3, 0];
+const beamDirArr = new Float32Array(15);
 const RING_R = [2.1, 2.6, 3.1];      // base radii (× maxR): nested hoops
 // (precession parked: everything holds still while we study the detail —
 // restore by adding a slow per-ring drift back onto ringTiltA in frame())
@@ -1094,6 +1104,22 @@ function randomize(){
   wN = 1;
   wSpan = 6.2831853;
   wPh0 = r()*6.2832;                         // where on the circle it hangs
+  // LASER FAN (appended rolls, fixed draw count): who gets visited, by how
+  // many pencils, in what colour, from where. The fan's own colour comes
+  // off the neon wheel — except on paper, where a third ink would break the
+  // print's two-colour discipline, so it borrows the companion ink.
+  beamOn = r() < 0.55 || location.hash.includes('beams');
+  beamN = 1 + Math.floor(Math.pow(r(), 1.5)*5);       // 1–5, mostly small fans
+  const beamIdx = Math.floor(r()*NEONS.length);
+  beamCol = printPick ? printPick.d : NEONS[beamIdx];
+  beamColName = printPick ? 'companion ink' : NEON_NAMES[beamIdx];
+  beamAz0 = r()*6.2832;
+  beamEl0 = rng(r, 0.30, 0.85);     // always plunging enough to reach the table
+  beamFan = rng(r, 0.05, 0.16);     // angular gap between neighbouring pencils
+  beamW = rng(r, 0.012, 0.035);     // pencil radius: hairline .. soft crayon
+  beamSpd = rng(r, 0.6, 1.5);       // one deal sweeps lazily, another restless
+  beamGate = r()*100;               // episode clock phase
+  beamPh1 = r()*100; beamPh2 = r()*100; beamPh3 = r()*100;
   // machine-readable deal summary for marketplaces/indexers (same wording
   // as the info panel)
   // machine-readable deal summary — the light-painting vocabulary (the
@@ -1113,6 +1139,8 @@ function randomize(){
              + (patSkew ? (patSkew > 0 ? ' · leaning cw' : ' · leaning ccw') : ''),
   };
   if(printPick) window.$features.paper = PAPER_NAMES[printPick.p];
+  if(beamOn) window.$features.lasers =
+    `${beamN} × ${beamColName}` + (beamN > 1 ? ' fan' : ' pencil');
   window.onDeal?.();   // optional hook — haiku.js captions the deal if loaded
   if(infoPanel.style.display === 'block') fillInfo();
 }
@@ -1173,6 +1201,10 @@ function sigFrom(hex, refLen){
 // smooth 1D noise: incommensurate sines, roughly in [-1, 1]
 const snz = (t, s) => 0.55*Math.sin(t + s) + 0.30*Math.sin(t*2.17 + s*1.7 + 1.3)
                     + 0.15*Math.sin(t*4.71 + s*0.9 + 4.1);
+const sstep = (a, b, x) => {
+  x = Math.min(Math.max((x - a)/(b - a), 0), 1);
+  return x*x*(3 - 2*x);
+};
 
 // ---------------------------------------------------------------------------
 // CICADAS — procedural, matched to the video's audio analysis:
@@ -1879,6 +1911,48 @@ function frame(){
     cols[6] = ringCol[0]; cols[7] = ringCol[1]; cols[8] = ringCol[2];
   }
 
+  // LASER FAN choreography: the episode gate rides the piece's own noise —
+  // the fan arrives, sweeps for half a minute or so, and leaves; while it
+  // is here the pivot circles slowly and the aim wanders across the bowl,
+  // so the pool below keeps a fading trail of everywhere it has been.
+  beamEnv = 0;
+  if(lightPaint && beamOn){
+    beamEnv = sstep(0.10, 0.38, snz(t*0.013*beamSpd, beamGate));
+    if(location.hash.includes('beams')) beamEnv = Math.max(beamEnv, 0.9);
+    if(beamEnv > 0.004){
+      const az = beamAz0 + 0.9*snz(t*0.010*beamSpd, beamPh1);
+      const el = Math.min(Math.max(
+        beamEl0 + 0.28*snz(t*0.008*beamSpd, beamPh2), 0.22), 1.05);
+      const ce = Math.cos(el);
+      beamPivot = [Math.cos(az)*ce*3.4, Math.sin(el)*3.4, Math.sin(az)*ce*3.4];
+      // aim: mid-bowl plus a slow wander and a faint hand tremor
+      const aim = [
+        maxR*(0.30*snz(t*0.017*beamSpd, beamPh3) + 0.05*snz(t*0.11, beamPh3 + 9.1)),
+        shape.H*(0.55 + 0.30*snz(t*0.013*beamSpd, beamPh3 + 31.7)),
+        maxR*(0.30*snz(t*0.019*beamSpd, beamPh3 + 57.1) + 0.05*snz(t*0.13, beamPh3 + 4.3))];
+      const bx = aim[0] - beamPivot[0], by = aim[1] - beamPivot[1],
+            bz = aim[2] - beamPivot[2];
+      const bl = Math.hypot(bx, by, bz);
+      const b0 = [bx/bl, by/bl, bz/bl];
+      // fan basis: perpendicular to the axis, rolled per deal and drifting
+      let ux = -b0[2], uy = 0, uz = b0[0];               // horizontal ⊥
+      const ul = Math.hypot(ux, uz) || 1;
+      ux /= ul; uz /= ul;
+      const vx = b0[1]*uz - b0[2]*uy, vy = b0[2]*ux - b0[0]*uz,
+            vz = b0[0]*uy - b0[1]*ux;                    // the other ⊥
+      const roll = beamAz0*1.7 + 0.4*snz(t*0.006*beamSpd, beamPh1 + 7.7);
+      const cr = Math.cos(roll), sr = Math.sin(roll);
+      const fx = ux*cr + vx*sr, fy = uy*cr + vy*sr, fz = uz*cr + vz*sr;
+      for(let k = 0; k < beamN; k++){
+        const off = (k - (beamN - 1)/2)*beamFan;
+        const co = Math.cos(off), so = Math.sin(off);
+        beamDirArr[k*3]     = b0[0]*co + fx*so;
+        beamDirArr[k*3 + 1] = b0[1]*co + fy*so;
+        beamDirArr[k*3 + 2] = b0[2]*co + fz*so;
+      }
+    }
+  }
+
   // where the glass projects up the sun ray onto the canopy plane — palm
   // and parasol anchor to this so their shade lands on the glass
   const cupy = Math.max(-dirs[1], 0.2);
@@ -2021,6 +2095,19 @@ function frame(){
     gl.uniform1f(uP.u_mode, 2);          // the white bulb string's own pass
     gl.drawArrays(gl.POINTS, 0, GW*GH);
   }
+  if(lightPaint && beamEnv > 0.004){
+    gl.uniform1f(uP.u_mode, 3);          // the laser fan's own pass
+    gl.uniform1f(uP.u_beamN, beamN);
+    gl.uniform3f(uP.u_beamP, ...beamPivot);
+    gl.uniform3fv(uP.u_beamD, beamDirArr);
+    // envelope premultiplied, kept modest: the pencils concentrate a whole
+    // grid of photons into a fingertip of table — full strength would trip
+    // the servo's peak ceiling and dim the hoop's pool
+    gl.uniform3f(uP.u_beamCol,
+      beamCol[0]*0.35*beamEnv, beamCol[1]*0.35*beamEnv, beamCol[2]*0.35*beamEnv);
+    gl.uniform1f(uP.u_beamW, beamW);
+    gl.drawArrays(gl.POINTS, 0, GW*GH);
+  }
   gl.disable(gl.BLEND);
 
   // auto-exposure (light painting): project what the still-charging buffer
@@ -2112,6 +2199,11 @@ function frame(){
   gl.uniform1f(uC.u_ringWSpan, wSpan);
   gl.uniform1f(uC.u_ringWPh0, wPh0);
   gl.uniform3f(uC.u_bulbCol, ...bulbCol);
+  gl.uniform1f(uC.u_beamN, beamEnv > 0.004 ? beamN : 0);
+  gl.uniform3f(uC.u_beamP, ...beamPivot);
+  gl.uniform3fv(uC.u_beamD, beamDirArr);
+  gl.uniform3f(uC.u_beamCol,
+    beamCol[0]*beamEnv, beamCol[1]*beamEnv, beamCol[2]*beamEnv);
   // orbit camera from the mouse, with a slow handheld drift on top;
   // target height and orbit radius scale with the glass so every shape frames
   const taY  = 0.33*shape.H + 0.35*shape.y0;   // aim nearer the bowl on stemware
