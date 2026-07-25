@@ -184,8 +184,12 @@ async function checkCode(){
   try {
     const slot = await ethCall(CONFIG.rpc, CONFIG.contract,
       selector('gifts(address)') + padAddress(addr));
-    const payer = '0x' + slot.slice(2 + 24, 2 + 64);
-    if(/^0+$/.test(payer)){
+    // the payer is the low 20 bytes of the gift struct's first word; test the
+    // bare hex (NOT a "0x"-prefixed string — the 'x' makes /^0+$/ never match,
+    // which used to let every well-formed but giftless code look valid). ^0*$
+    // also treats an empty/short slot from a flaky read as "no gift".
+    const payerHex = slot.slice(2 + 24, 2 + 64);
+    if(/^0*$/.test(payerHex)){
       $('codeMsg').textContent = 'this code has no waiting gift — it may already be redeemed.';
       $('codeMsg').className = 'err'; return;
     }

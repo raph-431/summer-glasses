@@ -166,5 +166,16 @@ check('reveals the glass when the mint landed but the reply was lost', revealed)
 check('never shows a bare failure after a successful mint',
       !/redeem failed/i.test(dom));
 
+// 4) a well-formed but giftless code must be rejected up front, not greeted as
+// valid (regression: the payer-empty check once tested a "0x"-prefixed string,
+// so /^0+$/ never matched and every code looked valid)
+const bogus = newCode();                       // never gifted -> no slot on chain
+dom = await runPage(encodeURIComponent(bogus), 'bogus', someone);
+// assert on the RENDERED status line, not the whole DOM: --dump-dom includes
+// the inline <script>, whose source literally contains "a glass is waiting"
+const msg = (dom.match(/id="codeMsg"[^>]*>([^<]*)</) || [])[1] || '';
+check('rejects a well-formed code with no waiting gift',
+      /no waiting gift/i.test(msg) && !/glass is waiting/i.test(msg));
+
 relay.close();
 process.exit(fails ? 1 : 0);
