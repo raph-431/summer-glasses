@@ -1920,16 +1920,16 @@ function frame(){
     beamEnv = sstep(0.10, 0.38, snz(t*0.013*beamSpd, beamGate));
     if(location.hash.includes('beams')) beamEnv = Math.max(beamEnv, 0.9);
     if(beamEnv > 0.004){
-      const az = beamAz0 + 0.9*snz(t*0.010*beamSpd, beamPh1);
+      const az = beamAz0 + 0.9*snz(t*0.055*beamSpd, beamPh1);
       const el = Math.min(Math.max(
-        beamEl0 + 0.28*snz(t*0.008*beamSpd, beamPh2), 0.22), 1.05);
+        beamEl0 + 0.28*snz(t*0.045*beamSpd, beamPh2), 0.22), 1.05);
       const ce = Math.cos(el);
       beamPivot = [Math.cos(az)*ce*3.4, Math.sin(el)*3.4, Math.sin(az)*ce*3.4];
       // aim: mid-bowl plus a slow wander and a faint hand tremor
       const aim = [
-        maxR*(0.30*snz(t*0.017*beamSpd, beamPh3) + 0.05*snz(t*0.11, beamPh3 + 9.1)),
-        shape.H*(0.55 + 0.30*snz(t*0.013*beamSpd, beamPh3 + 31.7)),
-        maxR*(0.30*snz(t*0.019*beamSpd, beamPh3 + 57.1) + 0.05*snz(t*0.13, beamPh3 + 4.3))];
+        maxR*(0.30*snz(t*0.095*beamSpd, beamPh3) + 0.05*snz(t*0.45, beamPh3 + 9.1)),
+        shape.H*(0.55 + 0.30*snz(t*0.070*beamSpd, beamPh3 + 31.7)),
+        maxR*(0.30*snz(t*0.105*beamSpd, beamPh3 + 57.1) + 0.05*snz(t*0.50, beamPh3 + 4.3))];
       const bx = aim[0] - beamPivot[0], by = aim[1] - beamPivot[1],
             bz = aim[2] - beamPivot[2];
       const bl = Math.hypot(bx, by, bz);
@@ -1940,7 +1940,7 @@ function frame(){
       ux /= ul; uz /= ul;
       const vx = b0[1]*uz - b0[2]*uy, vy = b0[2]*ux - b0[0]*uz,
             vz = b0[0]*uy - b0[1]*ux;                    // the other ⊥
-      const roll = beamAz0*1.7 + 0.4*snz(t*0.006*beamSpd, beamPh1 + 7.7);
+      const roll = beamAz0*1.7 + 0.4*snz(t*0.030*beamSpd, beamPh1 + 7.7);
       const cr = Math.cos(roll), sr = Math.sin(roll);
       const fx = ux*cr + vx*sr, fy = uy*cr + vy*sr, fz = uz*cr + vz*sr;
       for(let k = 0; k < beamN; k++){
