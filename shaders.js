@@ -578,11 +578,6 @@ uniform float u_ringWN;    // the bulb light is a STRING OF BULBS: count,
 uniform float u_ringWSpan; // ...the arc they span (rad),
 uniform float u_ringWPh0;  // ...and where along the circle the arc starts
 uniform vec3  u_bulbCol;   // bulb colour (the hoop's curated duo)
-uniform float u_beamN;     // LASER FAN (mode 3): live pencil count, 0 = off
-uniform vec3  u_beamP;     // the fan's shared pivot, well off-scene
-uniform vec3  u_beamD[5];  // per-pencil direction (normalized in JS)
-uniform vec3  u_beamCol;   // beam colour × episode envelope
-uniform float u_beamW;     // pencil radius
 const int GW = 512;
 const int GH = 288;
 const int PER = GW*GH;
@@ -617,7 +612,7 @@ void main(){
   vec2 j2 = hash22(uv*233.0 + float(li)*71.3 + u_seed*2.7) - 0.5;
   uv += j / vec2(float(GW), float(GH));
 
-  if(u_mode > 1.5 && u_mode < 2.5){
+  if(u_mode > 1.5){
     // WHITE BULB STRING (light painting): a series of glowing points along
     // an arc inside the vessel. Each photon belongs to one bulb — a true
     // point source, so each bulb lays its own crisp caustic through the
@@ -661,59 +656,8 @@ void main(){
 
   float th;
   vec3 Lj;
-  vec3 P1;
   vec3 lcol = u_lightCol[li];
-  if(u_mode > 2.5){
-    // LASER FAN (light painting): pencil-thin collimated beams from one
-    // shared pivot, sweeping the vessel. Each photon starts somewhere on
-    // its pencil's disc and marches onto the outer wall; from there it
-    // rides the same transport as sunlight, so the fan's refractions land
-    // as true caustics — and because the fan drifts, the long exposure
-    // records them as painted trails.
-    int bi = int(mod(float(pid), max(u_beamN, 1.0)));
-    vec3 bd = normalize(u_beamD[bi]);
-    vec3 bu = normalize(cross(bd, abs(bd.y) < 0.9 ? vec3(0.0, 1.0, 0.0)
-                                                  : vec3(1.0, 0.0, 0.0)));
-    vec3 bv = cross(bd, bu);
-    float ra = sqrt(uv.y)*u_beamW;             // uniform over the disc
-    float ph = uv.x*6.2831853;
-    vec3 p0 = u_beamP + bu*(ra*cos(ph)) + bv*(ra*sin(ph));
-    // a whisper of divergence: a laboratory-parallel pencil lays a caustic
-    // so thin the accumulation can't fill it
-    Lj = normalize(bd + (bu*j2.x + bv*j2.y)*0.004);
-    lcol = u_beamCol;
-    // march onto the revolved profile (sans facet relief — that's
-    // millimetres, and the entry normal below picks it back up)
-    float tb = 0.0, db = 1e3;
-    for(int i2 = 0; i2 < 40; i2++){
-      vec3 q = p0 + Lj*tb;
-      db = (q.y > u_H + 0.03 || q.y < -0.02)
-         ? max(q.y - u_H, -q.y)
-         : length(q.xz) - profileR(clamp(q.y, 0.0, u_H));
-      if(db < 0.004 || tb > 7.0) break;
-      tb += max(db*0.75, 0.006);
-    }
-    if(db < 0.004){
-      vec3 q = p0 + Lj*tb;
-      // light diving past the rim pools inside the bowl, not on the
-      // table — those photons leave the record
-      if(q.y > u_H - 0.03 && length(q.xz) < profileR(u_H) - 0.6*u_wall){ kill(); return; }
-      th = atan(q.z, q.x);
-      y = clamp(q.y, 0.01, 0.995*u_H);
-      P1 = outerPos(th, y);
-    } else {
-      // clean miss: the bare pencil lands on the table as its own stripe —
-      // the sweep draws straight lines beside the refracted lace
-      if(Lj.y > -0.03){ kill(); return; }
-      float s0 = -p0.y / Lj.y;
-      if(s0 > 8.0){ kill(); return; }
-      vec3 hit0 = p0 + Lj*s0;
-      gl_Position = vec4((hit0.xz - u_caustC)/u_caustS, 0.0, 1.0);
-      gl_PointSize = 1.5;
-      v_col = lcol * chCol * 0.20;
-      return;
-    }
-  } else if(u_arty > 0.5 && li < 2){
+  if(u_arty > 0.5 && li < 2){
     // THE colored hoop: one tube per deal, in one rolled colour — slots 0
     // and 1 both pour into it (double density). Slot 2 falls through to
     // the directional path below: a bare distant sun over the void.
@@ -730,7 +674,7 @@ void main(){
     th = atan(-L.z, -L.x) + (uv.x - 0.5) * 2.6;
   }
 
-  if(u_mode < 2.5) P1 = outerPos(th, y);
+  vec3 P1 = outerPos(th, y);
   vec3 N1 = outerNormal(th, y);
 
   // condensation: droplets act as extra little lenses on the entry wall,
@@ -755,15 +699,13 @@ void main(){
   float w = face * (u_arty > 0.5 ? 1.0 : dapple(P1, li));
   if(w < 0.004){ kill(); return; }
   w *= 1.0 - 0.40*mistP;
-  // launch grid is uniform in (th,y); weight by area. Lasers sample their
-  // own disc uniformly — no grid to compensate.
-  if(u_mode < 2.5) w *= profileR(y)/u_maxR;
+  w *= profileR(y)/u_maxR;   // launch grid is uniform in (th,y); weight by area
 
   // the gilded rim band is opaque metal: it blocks transmission and
   // mirrors the reflection caustic in gold
   vec3 rimTint = vec3(1.0);
   if(u_rim > 0.5 && y > u_H - 0.050){
-    if(u_mode < 0.5 || u_mode > 2.5){ kill(); return; }   // opaque to lasers too
+    if(u_mode < 0.5){ kill(); return; }
     rimTint = u_rimCol;
   }
 
@@ -777,7 +719,7 @@ void main(){
   float c1 = abs(dot(N1, Lj));
   float F = 0.04 + 0.96*pow(1.0 - c1, 5.0);
 
-  if(u_mode > 0.5 && u_mode < 1.5){
+  if(u_mode > 0.5){
     // ---- the REFLECTION caustic: the energy the wall bounces off,
     // landing as a bright arc on the sun side of the glass
     vec3 dr = reflect(Lj, N1);
@@ -1138,10 +1080,6 @@ uniform float u_ringWN;      // bulb count
 uniform float u_ringWSpan;   // arc span (rad)
 uniform float u_ringWPh0;    // arc start phase
 uniform vec3  u_bulbCol;     // bulb colour (the hoop's curated duo)
-uniform float u_beamN;       // LASER FAN: live pencil count, 0 = off
-uniform vec3  u_beamP;       // the fan's shared pivot
-uniform vec3  u_beamD[5];    // per-pencil direction
-uniform vec3  u_beamCol;     // beam colour × episode envelope
 in vec2 v_uv;
 out vec4 o;
 
@@ -1595,29 +1533,6 @@ void main(){
       float g = exp(-d2k/0.00015) + 0.10*exp(-d2k/0.003);
       colA += u_bulbCol * 1.80 * g;
       if(g > 0.5) hitA = min(hitA, tk);           // the bulbs hold focus
-    }
-    // the lasers, seen directly: pencil beams sweeping the void, each a
-    // hot core wrapped in a haze halo. Same license as the bulbs — the
-    // table occludes them, the ghost vessel does not; the pool below
-    // carries their refractions.
-    for(int k=0;k<5;k++){
-      if(float(k) >= u_beamN || u_hideG > 0.5) break;
-      vec3 bd = normalize(u_beamD[k]);
-      vec3 w0 = ro - u_beamP;
-      float bb = dot(rd, bd);
-      float den = 1.0 - bb*bb;
-      if(den < 1e-5) continue;
-      float sV = (bb*dot(w0, bd) - dot(w0, rd))/den;   // along the view ray
-      float uB = dot(w0, bd) + sV*bb;                  // along the pencil
-      // the lit span: pivot to table (or off into the void if it never lands)
-      float uEnd = bd.y < -0.02 ? -u_beamP.y/bd.y : 8.0;
-      uB = clamp(uB, 0.0, uEnd);
-      sV = dot(u_beamP + bd*uB - ro, rd);
-      if(sV <= 0.0 || (tTable < 1e4 && sV > tTable)) continue;
-      vec3 dv = w0 + rd*sV - bd*uB;
-      float d2b = dot(dv, dv);
-      float g = exp(-d2b/3.0e-5) + 0.10*exp(-d2b/2.0e-3);
-      colA += u_beamCol * g * 1.3;
     }
     o = vec4(colA, hitA);
     return;
