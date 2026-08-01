@@ -950,6 +950,14 @@ function randomize(){
   // The stock is rolled LATER, once the hoop colour is known — only from
   // the papers curated for that hue's ink (PAPER_FOR).
   inverted = r() < 0.50;
+  // the top-corner light/dark switch rides the URL as #bg= and forces the
+  // side of that roll. The draw above still burns either way, so the same
+  // seed deals the same vessel on both sides — only the rendering flips.
+  // Inert in token mode: a minted deal is fixed.
+  if(!TOKEN_MODE){
+    const bgm = location.hash.match(/bg=(light|dark)/);
+    if(bgm) inverted = bgm[1] === 'light';
+  }
 
   // crystal: harder refraction, real fire, deep cuts. EXPERIMENT: half of
   // ALL bodies are crystal (no stemware bias), and COLOURED crystal is
@@ -1114,6 +1122,7 @@ function randomize(){
   };
   if(printPick) window.$features.paper = PAPER_NAMES[printPick.p];
   window.onDeal?.();   // optional hook — haiku.js captions the deal if loaded
+  syncBgBtns();
   if(infoPanel.style.display === 'block') fillInfo();
 }
 
@@ -1136,6 +1145,39 @@ $('infoBtn').addEventListener('click', () => {
   if(!open) fillInfo();
   infoPanel.style.display = open ? 'none' : 'block';
 });
+
+// ---- light/dark switch (top corner) ---------------------------------------
+// Chooses which side of the print roll the deal takes: dark = the light
+// painting in the void, light = the negative on paper. The choice is a #bg=
+// flag in the URL, so it survives reloads and travels in shared links; with
+// a #seed pinned it flips the SAME vessel between the two renderings.
+const bgDark = $('bgDark'), bgLight = $('bgLight');
+function syncBgBtns(){
+  bgDark.classList.toggle('on', !inverted);
+  bgLight.classList.toggle('on', inverted);
+}
+if(TOKEN_MODE){
+  // a minted token shows exactly its one deal — no switch
+  document.getElementById('top').style.display = 'none';
+} else {
+  const forceBg = side => {
+    const rest = location.hash.replace(/^#/, '').split('&')
+      .filter(p => p && !/^bg=/.test(p));
+    location.hash = '#' + [...rest, 'bg=' + side].join('&');
+    location.reload();
+  };
+  bgDark.addEventListener('click',
+    () => { if(!bgDark.classList.contains('on')) forceBg('dark'); });
+  bgLight.addEventListener('click',
+    () => { if(!bgLight.classList.contains('on')) forceBg('light'); });
+  // renew: a fresh deal — drop the pinned seed, keep the mode and dev flags
+  $('renewBtn').addEventListener('click', () => {
+    const rest = location.hash.replace(/^#/, '').split('&')
+      .filter(p => p && !/^seed=/.test(p));
+    location.hash = rest.length ? '#' + rest.join('&') : '';
+    location.reload();
+  });
+}
 // dev hook: load index.html#randtest to hammer the randomizer for errors.
 // Inert in token mode — a minted token shows exactly its one deal.
 if(!TOKEN_MODE && location.hash === '#randtest'){ for(let i=0;i<60;i++) randomize(); }
