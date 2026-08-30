@@ -1,22 +1,21 @@
-# Blockaid false-positive review — the successor contract (2026-08-30)
+# Blockaid false-positive report — Summer Glasses (2026-08-30)
 
-The July report (reporter raphamey.studio@gmail.com, domain summerdrinks.fun)
-was filed against the PREDECESSOR address `0x87e9…a4A8` — two days after
-filing we redeployed, and the contract the site actually calls, `0xb5F7…BD6e`
-(+ its receipt companion), was never reported at all. (The record we have of
-the July report is the submission itself; whether Blockaid acted on it is
-unknown.) This is a new report for the successor addresses, referencing the
-earlier one. File it at https://report.blockaid.io/. Fill in `[your name]` and, if
-you have one handy, a recent `gift()` transaction hash where the warning
-appeared.
+Fresh report for the live contracts, filed as a new ticket at
+https://report.blockaid.io/ (address field: `0xb5F7…BD6e`, domain
+`summerdrinks.fun`; then a second ticket for the receipt contract pointing at
+the first). Standalone on purpose — the July report named the predecessor
+address and never got a reply, so this one doesn't lean on it. Fill in
+`[your name]` and, if you have one handy, a recent `gift()` transaction hash
+where the warning appeared. Also file the in-wallet report on that same
+transaction (MetaMask: See details → Report an issue).
 
 ---
 
-**Subject: False positive — successor addresses of a previously reported contract (Summer Glasses, Base)**
+**Subject: False positive — legitimate on-chain NFT gift contract flagged on `gift()` (Summer Glasses, Base)**
 
 Hello,
 
-In July I reported a false positive on our contract `0x87e957299624dE48285ff420989749760b58a4A8` (Base). Two days after filing, I redeployed the project to new addresses (details below) — so that report now points at an address nobody calls, while the successor addresses that our site actually uses, and that MetaMask still flags on `gift()`, have never been reported. I'd like to ask for both of them to be reviewed and cleared. They have now been in normal use for five weeks.
+MetaMask shows a "you may lose assets" warning when users call `gift()` on our contract on Base. The contract is a small, fully open-source NFT gift contract that has been in normal use for five weeks; I'd like to ask for it and its companion contract to be reviewed and cleared.
 
 **Project.** Summer Glasses ("Summer in a Glass") — an on-chain generative art series on Base: each token is a WebGL artwork of a cold drink on a sunlit table, stored fully on-chain. Tokens are sold as **gifts**: a buyer prepays a glass for someone, and the recipient redeems it later with a code.
 
@@ -41,7 +40,7 @@ In July I reported a false positive on our contract `0x87e957299624dE48285ff4209
 - The contract is ERC-721 with a fixed 1,000 maximum supply, `Ownable` admin limited to price, royalty, art-freeze, thumbnail pointer and `withdraw()`; there are no approvals requested from users, no `transferFrom` of user assets, and no upgradeability.
 - Both contracts are fully open-source and verified; the front-end that calls them is in the same public repository.
 
-**Relationship to the cleared contract.** The predecessor `0x87e957299624dE48285ff420989749760b58a4A8` (deployed 2026-07-21, the subject of my July report) is the same contract minus the receipt: its `gift()` returned nothing to the caller, which we understood to be what tripped the "pay and receive nothing" heuristic. We redeployed on 2026-07-23 specifically to add the Gift Receipt NFT so that the simulation is honest. The predecessor is now unused — the site has pointed at the successor since 2026-07-23 — so whatever the outcome of the July report, it concerns an address nobody calls, while the one in use is still flagged. Everything stated in the July report (escrow the owner cannot touch, `withdraw()` limited to redeemed proceeds, `reclaim()` after 365 days, verified source, public repository) holds unchanged for the successor.
+We believe the flag comes from the addresses being relatively new (deployed 2026-07-23) with little reputation, combined with a payable call whose main effect — the escrow — is not visible as an asset transfer to the caller. The receipt NFT exists precisely so that the simulation reflects what the caller gets.
 
 Happy to provide anything else: a walkthrough of a sample `gift()` transaction to simulate [optionally: e.g. tx `0x…`], a contact verification, or additional source. Thank you for taking a look.
 
