@@ -42,7 +42,7 @@ linger client-side briefly after Blockaid clears it.
 - `transferOwnership` — owner is still the local `deployer-base` keystore;
   move to a hardware wallet before this matters.
 - `setRoyalty` — unset (no royalty), by choice.
-- `setImageBase` — unset, so marketplace cards have no static image.
+- `setImageBase` — see §3: point it at `https://summerdrinks.fun/thumb/` once the thumbnails are deployed.
 
 
 The full path from this repo to a live series on Base. Everything below
@@ -208,10 +208,14 @@ lands in their wallet).
 - Point `web/config.js` default at `base`, publish the pages.
 - Watch relayer logs; `/status` is a health endpoint.
 - Preview images (marketplace `image` field): add any time, even after the
-  art freeze — deploy a renderer service and
-  `cast send $CONTRACT "setImageBase(string)" "https://render…/glass/"`;
-  tokenURI then emits `image: <base><tokenId>`. The pointer is deliberately
-  mutable (it's a thumbnail convenience, not the artwork); leaving it unset
-  keeps tokens animation_url-only.
+  art freeze — `node web/tools/render-thumbs.mjs` writes `web/thumb/<id>.jpg`
+  for every minted glass (served at `/thumb/<id>`), deploy, then once:
+  `cast send $CONTRACT "setImageBase(string)" "https://summerdrinks.fun/thumb/"`;
+  tokenURI then emits `image: <base><tokenId>`. After new redemptions, re-run
+  the script (it skips ids already rendered) and deploy; hit "Refresh
+  metadata" on OpenSea for stragglers. The pointer is deliberately mutable
+  (it's a thumbnail convenience, not the artwork); leaving it unset keeps
+  tokens animation_url-only — and marketplaces then show blank cards, since
+  none of them render a `data:` animation_url.
 - If a gifted code is reported lost: nothing to do — the gifter reclaims
   after the year, on their own.

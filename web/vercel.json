@@ -1,5 +1,8 @@
 {
   "functions": {
     "api/redeem.mjs": { "maxDuration": 60 }
-  }
+  },
+  "rewrites": [
+    { "source": "/thumb/:id(\\d+)", "destination": "/thumb/:id.jpg" }
+  ]
 }
