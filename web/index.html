@@ -173,7 +173,7 @@
 import CONFIG from './config.js';
 import { fetchMeta, htmlForSeed, seedOf, ownerOf, tokensOf, totalMinted, renderInto,
          shortAddr } from './lib/token.js';
-import { thumbnail } from './lib/thumbs.js';
+import { thumbnail, staticThumb } from './lib/thumbs.js';
 
 const $ = id => document.getElementById(id);
 const setMsg = (t, cls = 'muted') => { $('msg').textContent = t; $('msg').className = cls; };
@@ -270,28 +270,42 @@ async function fill(el, tokenId){
       el.querySelector('.mine').textContent = 'yours';
   }).catch(() => {});
 
-  try {
+  const thumb = el.querySelector('.g-thumb');
+  const pending = (text, why) => {
+    let p = el.querySelector('.g-pending');
+    if(!p){ p = document.createElement('span'); p.className = 'g-pending'; thumb.appendChild(p); }
+    p.textContent = text;
+    if(why) p.title = why;                       // hover to see the reason
+  };
+  // the glass photographs itself — the fallback for portraits the site
+  // doesn't ship yet (redeemed since the last render run)
+  const live = async () => {
     const seed = await seedOf(CONFIG, tokenId);
-    const { jpeg, drink, glassware } = await thumbnail(seed, () => htmlForSeed(CONFIG, seed));
-    if(typeof jpeg !== 'string' || !jpeg.startsWith('data:image')) throw new Error('bad thumbnail');
-    const name = makeName(tokenId, drink, glassware);
-    const thumb = el.querySelector('.g-thumb');
+    const rec = await thumbnail(seed, () => htmlForSeed(CONFIG, seed));
+    if(typeof rec.jpeg !== 'string' || !rec.jpeg.startsWith('data:image')) throw new Error('bad thumbnail');
+    return rec;
+  };
+  const fail = e => {
+    console.warn(`thumbnail #${tokenId} failed:`, e && (e.message || e));
+    pending('tap to view', 'thumbnail failed: ' + (e && (e.message || e)));
+  };
+  const paint = ({ jpeg, drink, glassware }, onError) => {
     const img = new Image();
     img.alt = '';
-    // a bad/undecodable jpeg must never show the browser's broken-image icon
-    img.onerror = () => { img.remove(); if(!thumb.querySelector('.g-pending')){
-      const p = document.createElement('span'); p.className = 'g-pending'; p.textContent = 'tap to view'; thumb.appendChild(p); } };
+    // a bad/undecodable image must never show the browser's broken-image icon
+    img.onerror = () => { img.remove(); onError(); };
     img.onload = () => { el.querySelector('.g-pending')?.remove(); thumb.classList.add('loaded'); };
     img.src = jpeg;
     thumb.appendChild(img);
-    el.querySelector('.g-name').textContent = name;
-  } catch(e){
-    console.warn(`thumbnail #${tokenId} failed:`, e && (e.message || e));
-    let p = el.querySelector('.g-pending');
-    if(!p){ p = document.createElement('span'); p.className = 'g-pending'; el.querySelector('.g-thumb').appendChild(p); }
-    p.textContent = 'tap to view';
-    p.title = 'thumbnail failed: ' + (e && (e.message || e));   // hover to see the reason
-  }
+    el.querySelector('.g-name').textContent = makeName(tokenId, drink, glassware);
+  };
+
+  try {
+    // pre-rendered portrait first: instant, no WebGL, no chain read
+    const ready = await staticThumb(CONFIG, tokenId);
+    if(ready) paint(ready, () => live().then(rec => paint(rec, () => fail(new Error('bad image')))).catch(fail));
+    else paint(await live(), () => fail(new Error('bad image')));
+  } catch(e){ fail(e); }
 }
 
 async function loadGallery(){

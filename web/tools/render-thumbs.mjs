@@ -11,7 +11,9 @@
 //
 //   cast send $CONTRACT "setImageBase(string)" "https://<site>/thumb/"
 //
-// Re-run after new redemptions: already-rendered ids are skipped. Plain Node,
+// Re-run after new redemptions: already-rendered ids are skipped. Also
+// writes web/thumb/index.json (ids + deal labels) — the gallery reads it to
+// show these portraits instead of rendering its own. Plain Node,
 // no deps; needs Chrome (Node >= 22 for the built-in WebSocket).
 //
 // Usage: node web/tools/render-thumbs.mjs [--net base|baseSepolia|anvil]
@@ -117,26 +119,27 @@ async function shoot(html, jpg){
     await send('Page.navigate', { url: 'file://' + page });
     for(let i = 0; i < 200 && !events.includes('Page.loadEventFired'); i++) await new Promise(r => setTimeout(r, 100));
     await new Promise(r => setTimeout(r, SECS*1000));
-    if(PROBE){
-      // what the page actually rendered with: GL renderer, real frame rate,
-      // and the deal it dealt (compare against view.html#<id> in a browser)
-      const probe = await send('Runtime.evaluate', { awaitPromise: true, returnByValue: true, expression: `
-        new Promise(done => { let n = 0; const t0 = performance.now();
-          (function f(){ n++; performance.now() - t0 < 2000 ? requestAnimationFrame(f) : done(n/2); })();
-        }).then(fps => { const g = document.querySelector('canvas').getContext('webgl2');
-          const d = g && g.getExtension('WEBGL_debug_renderer_info');
-          return JSON.stringify({ fps, gl: d ? g.getParameter(d.UNMASKED_RENDERER_WEBGL) : (g ? g.getParameter(g.RENDERER) : 'none'),
-            features: window.$features }); })` });
-      console.log('  ' + (probe.result?.result?.value ?? JSON.stringify(probe)));
-    }
+    // the deal's labels ride along in the manifest: the gallery names rows
+    // from $features, which a static JPEG can't supply. --probe also logs
+    // the GL renderer and real frame rate.
+    const probe = await send('Runtime.evaluate', { awaitPromise: true, returnByValue: true, expression: `
+      new Promise(done => { let n = 0; const t0 = performance.now();
+        (function f(){ n++; performance.now() - t0 < 1000 ? requestAnimationFrame(f) : done(n); })();
+      }).then(fps => { const g = document.querySelector('canvas').getContext('webgl2');
+        const d = g && g.getExtension('WEBGL_debug_renderer_info');
+        return JSON.stringify({ fps, gl: d ? g.getParameter(d.UNMASKED_RENDERER_WEBGL) : (g ? g.getParameter(g.RENDERER) : 'none'),
+          features: window.$features || null }); })` });
+    const info = JSON.parse(probe.result?.result?.value ?? '{}');
+    if(PROBE) console.log('  ' + JSON.stringify(info));
+    if(!info.features) throw new Error('no $features on the page');
     const shot = await send('Page.captureScreenshot', { format: 'jpeg', quality: 88 });
     if(!shot.result?.data) throw new Error('no screenshot: ' + JSON.stringify(shot.error || shot));
     fs.writeFileSync(jpg, Buffer.from(shot.result.data, 'base64'));
     ws.close();
-    return true;
+    return info.features;
   } catch(e){
     console.log('  ' + e.message);
-    return false;
+    return null;
   } finally {
     clearTimeout(guard);
     chrome.kill('SIGKILL');
@@ -145,16 +148,26 @@ async function shoot(html, jpg){
   }
 }
 
+// web/thumb/index.json — which ids have a portrait, and each deal's labels.
+// Bound to one contract so a gallery pointed at anvil never borrows Base's.
+const MANIFEST = path.join(OUT, 'index.json');
+let manifest = { chainId: cfg.chainId, contract: cfg.contract, glasses: {} };
+try {
+  const m = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
+  if(m.chainId === cfg.chainId && m.contract?.toLowerCase() === cfg.contract.toLowerCase()) manifest = m;
+} catch {}
+const saveManifest = () => fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 1) + '\n');
+
 let done = 0, skipped = 0, failed = [];
 for(const id of ids){
   const jpg = path.join(OUT, `${id}.jpg`);
-  if(!FORCE && fs.existsSync(jpg)){ skipped++; continue; }
+  if(!FORCE && fs.existsSync(jpg) && manifest.glasses[id]){ skipped++; continue; }
   const seed = await seedOf(cfg, id);
   if(/^0x0*$/.test(seed)){ console.log(`#${id}: not minted, skipping`); continue; }
   const t0 = Date.now();
   const html = pageFor(await htmlForSeed(cfg, seed));
-  const ok = await shoot(html, jpg);
-  if(ok){ done++; console.log(`#${id}: ${(fs.statSync(jpg).size/1024).toFixed(0)} KB in ${((Date.now()-t0)/1000).toFixed(0)}s`); }
+  const features = await shoot(html, jpg);
+  if(features){ manifest.glasses[id] = features; saveManifest(); done++; console.log(`#${id}: ${(fs.statSync(jpg).size/1024).toFixed(0)} KB in ${((Date.now()-t0)/1000).toFixed(0)}s`); }
   else { failed.push(id); console.log(`#${id}: FAILED`); }
 }
 console.log(`rendered ${done}, skipped ${skipped} (already there)${failed.length ? ', failed: ' + failed.join(',') : ''}`);

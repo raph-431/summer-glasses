@@ -1,0 +1,159 @@
+{
+ "chainId": 8453,
+ "contract": "0xb5F7C80B98aCFb553b3e01E9fEe0FCa4950CBD6e",
+ "glasses": {
+  "1": {
+   "drink": "rosé",
+   "glassware": "wine",
+   "pattern": "smooth",
+   "timeOfDay": "noon",
+   "canopy": "parasol",
+   "table": "stone",
+   "ice": 0
+  },
+  "2": {
+   "drink": "pastis",
+   "glassware": "alembic",
+   "pattern": "ribs",
+   "timeOfDay": "dawn",
+   "canopy": "pergola",
+   "table": "stone",
+   "ice": 0
+  },
+  "3": {
+   "drink": "white wine",
+   "glassware": "wine bottle",
+   "pattern": "hobnail",
+   "timeOfDay": "sunset",
+   "canopy": "broadleaf",
+   "table": "tiles",
+   "ice": 0
+  },
+  "4": {
+   "drink": "gin",
+   "glassware": "shot",
+   "pattern": "diamond",
+   "timeOfDay": "nighttime",
+   "canopy": "palm",
+   "table": "stone",
+   "ice": 1
+  },
+  "5": {
+   "drink": "champagne",
+   "glassware": "crystal flute",
+   "pattern": "pinstripes",
+   "timeOfDay": "morning",
+   "canopy": "pergola",
+   "table": "concrete",
+   "ice": 0
+  },
+  "6": {
+   "drink": "shirley temple",
+   "glassware": "highball",
+   "pattern": "hobnail",
+   "timeOfDay": "dusk",
+   "canopy": "broadleaf",
+   "table": "light wood",
+   "ice": 0
+  },
+  "7": {
+   "drink": "water",
+   "glassware": "crystal wine bottle",
+   "pattern": "ribs",
+   "timeOfDay": "dusk",
+   "canopy": "fine leaf",
+   "table": "light wood",
+   "ice": 0
+  },
+  "8": {
+   "drink": "apple juice",
+   "glassware": "crystal goblet",
+   "pattern": "ribs",
+   "timeOfDay": "dusk",
+   "canopy": "fine leaf",
+   "table": "stone",
+   "ice": 0
+  },
+  "9": {
+   "drink": "lemonade",
+   "glassware": "flared",
+   "pattern": "pinstripes",
+   "timeOfDay": "dusk",
+   "canopy": "fine leaf",
+   "table": "tiles",
+   "ice": 0
+  },
+  "10": {
+   "drink": "water",
+   "glassware": "goblet",
+   "pattern": "diamond",
+   "timeOfDay": "afternoon",
+   "canopy": "broadleaf",
+   "table": "dark wood",
+   "ice": 0
+  },
+  "11": {
+   "drink": "blue lagoon",
+   "glassware": "rocks",
+   "pattern": "hobnail",
+   "timeOfDay": "sunset",
+   "canopy": "fine leaf",
+   "table": "tiles",
+   "ice": 0
+  },
+  "12": {
+   "drink": "chartreuse",
+   "glassware": "fishbowl",
+   "pattern": "ribs",
+   "timeOfDay": "dusk",
+   "canopy": "broadleaf",
+   "table": "stone",
+   "ice": 1
+  },
+  "13": {
+   "drink": "whiskey",
+   "glassware": "shot",
+   "pattern": "diamond",
+   "timeOfDay": "nighttime",
+   "canopy": "broadleaf",
+   "table": "dark wood",
+   "ice": 3
+  },
+  "14": {
+   "drink": "rosé",
+   "glassware": "wine bottle",
+   "pattern": "diamond",
+   "timeOfDay": "morning",
+   "canopy": "parasol",
+   "table": "tiles",
+   "ice": 0
+  },
+  "15": {
+   "drink": "lemonade",
+   "glassware": "fishbowl",
+   "pattern": "ribs",
+   "timeOfDay": "dawn",
+   "canopy": "pergola",
+   "table": "stone",
+   "ice": 3
+  },
+  "16": {
+   "drink": "pastis",
+   "glassware": "crystal highball",
+   "pattern": "hobnail",
+   "timeOfDay": "afternoon",
+   "canopy": "broadleaf",
+   "table": "stone",
+   "ice": 0
+  },
+  "17": {
+   "drink": "rosé",
+   "glassware": "flute",
+   "pattern": "spiral",
+   "timeOfDay": "afternoon",
+   "canopy": "fine leaf",
+   "table": "stone",
+   "ice": 0
+  }
+ }
+}

@@ -8,7 +8,33 @@
 // once per browser. Requests run five at a time, each batch finishing before
 // the next starts — every live glass is a WebGL context, and browsers only
 // allow so many at once.
+//
+// That is the fallback. The site also ships pre-rendered portraits
+// (web/thumb/<id>.jpg + index.json, made by web/tools/render-thumbs.mjs for
+// the marketplace `image` field); staticThumb() serves those first, so the
+// live path only runs for glasses redeemed since the last render.
 // ---------------------------------------------------------------------------
+
+let manifestP = null;
+function manifest(){
+  if(manifestP) return manifestP;
+  manifestP = fetch(new URL('../thumb/index.json', import.meta.url))
+    .then(r => r.ok ? r.json() : null)
+    .catch(() => null);
+  return manifestP;
+}
+
+/// A pre-rendered portrait for a token, or null when there isn't one (or the
+/// manifest belongs to another contract — a gallery on anvil must not borrow
+/// Base's). Same shape as thumbnail(), with a URL in place of a data: URI.
+export async function staticThumb(cfg, tokenId){
+  const m = await manifest();
+  if(!m || m.chainId !== cfg.chainId || m.contract?.toLowerCase() !== cfg.contract.toLowerCase()) return null;
+  const f = m.glasses?.[tokenId];
+  if(!f) return null;
+  return { jpeg: new URL(`../thumb/${tokenId}.jpg`, import.meta.url).href,
+           drink: f.drink ?? null, glassware: f.glassware ?? null };
+}
 
 const DB = 'summer-glasses', STORE = 'thumbs';
 // The cache format has grown over development (jpeg string -> {jpeg,drink} ->
