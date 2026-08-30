@@ -42,7 +42,7 @@ linger client-side briefly after Blockaid clears it.
 - `transferOwnership` — owner is still the local `deployer-base` keystore;
   move to a hardware wallet before this matters.
 - `setRoyalty` — unset (no royalty), by choice.
-- `setImageBase` — see §3: point it at `https://summerdrinks.fun/thumb/` once the thumbnails are deployed.
+- `setImageBase` — set to `https://summerdrinks.fun/thumb/` on 2026-08-30 (tx `0x336b05f3…45bc5`); re-run `web/tools/render-thumbs.mjs` + deploy after new redemptions (§3).
 
 
 The full path from this repo to a live series on Base. Everything below
