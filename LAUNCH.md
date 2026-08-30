@@ -6,7 +6,8 @@
 |---|---|
 | contract (v2) | `0xb5F7C80B98aCFb553b3e01E9fEe0FCa4950CBD6e` (Base, chainId 8453) |
 | gift receipt | `0xf3D49De68fCb26be78eFd36DD828cd0206F0400f` (keepsake minted to gifter) |
-| owner / deployer | `0xa4Cf6e6bc4264711f107d6fEb60f256Ae0a7055C` (keystore `deployer-base`) |
+| deployer | `0xa4Cf6e6bc4264711f107d6fEb60f256Ae0a7055C` (keystore `deployer-base`) — no longer owner |
+| owner (both contracts) | `0x5133135153964675f9fd2eD6D234572129af3a87` (MetaMask, the OpenSea account) — since 2026-08-30 |
 | relayer | `0xdA5BDb3Cfd7406dFd873D2E983901C0ADDCe9222` (keystore `relayer-base`) |
 | site | https://summerdrinks.fun (`/api/status` = health check) |
 | params | price 0.002 ETH · stipend 0.00005 ETH · maxSupply 1000 |
@@ -39,8 +40,12 @@ linger client-side briefly after Blockaid clears it.
 **Still open, deliberately:**
 - `freezeArt()` — NOT called. Art stays updatable via `UpdateArt.s.sol`.
 - `lockSupply()` — NOT called. maxSupply 1000 remains adjustable.
-- `transferOwnership` — owner is still the local `deployer-base` keystore;
-  move to a hardware wallet before this matters.
+- `transferOwnership` — DONE 2026-08-30: both contracts moved from the
+  `deployer-base` keystore to the MetaMask wallet `0x5133…3a87` (so OpenSea
+  recognises it as collection owner). Owner-only calls (`withdraw`, `setPrice`,
+  `freezeArt`, `setImageBase`, `setRoyalty`) now go through that wallet — easiest
+  via Basescan → Contract → Write Contract → Connect to Web3 (source is
+  verified). `deployer-base` keeps only its leftover ETH.
 - `setRoyalty` — unset (no royalty), by choice.
 - `setImageBase` — set to `https://summerdrinks.fun/thumb/` on 2026-08-30 (tx `0x336b05f3…45bc5`); re-run `web/tools/render-thumbs.mjs` + deploy after new redemptions (§3).
 
