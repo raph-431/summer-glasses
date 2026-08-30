@@ -217,5 +217,11 @@ lands in their wallet).
   (it's a thumbnail convenience, not the artwork); leaving it unset keeps
   tokens animation_url-only — and marketplaces then show blank cards, since
   none of them render a `data:` animation_url.
+- For future redemptions the loop is unchanged:
+  `node web/tools/render-thumbs.mjs` → commit → push. New tokens get indexed
+  *with* the image field from the start (since `imageBase` is now set), so no
+  refresh dance — OpenSea fetches `/thumb/<id>` on first index, which just
+  needs to exist by then. If a new glass's card hasn't landed in an hour or
+  so, hit "Refresh metadata" on that item once.
 - If a gifted code is reported lost: nothing to do — the gifter reclaims
   after the year, on their own.
